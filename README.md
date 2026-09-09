@@ -2,7 +2,8 @@
 
 单文件、零依赖的费率结算工具：输入金额 / 汇率 / 上下游费率，实时算出实收、实付、毛利，一键生成 Telegram 工单并入账。
 
-**🌐 在线使用（GitHub Pages）**：`https://<你的用户名>.github.io/fee-calculator/`
+**🌐 在线使用（GitHub Pages）**：https://akonair.github.io/fee-calculator/
+手机 / 电脑浏览器直接打开即用，无需安装；可「添加到主屏幕」像 App 一样打开。
 
 **🖥 本地使用**：双击 `index.html`（或 `fee-calculator/index.html`）即可，无需联网、无需安装。
 
