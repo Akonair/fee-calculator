@@ -1,0 +1,3540 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-page-node-id="Dpk8BNDu6M3aLbLCJD5QiZ">
+<head data-page-node-id="2xUerV2NjqwEfF3voxFQyq">
+<meta charset="UTF-8" data-page-node-id="rUINR62ckkReB3GkNoq80J">
+<meta name="viewport" content="width=device-width, initial-scale=1.0" data-page-node-id="aCrFAeZ5hW8uGNjhoC8bSc">
+<title>费率结算自动计算器</title>
+<style>
+/* ============================================================
+   样式区：浅色金融工具风格（白底、卡片分区、表格数字）
+   ============================================================ */
+:root {
+  --bg: #f4f6f9;
+  --card: #ffffff;
+  --border: #e2e8f0;
+  --text: #1e293b;
+  --text-sub: #64748b;
+  --text-light: #94a3b8;
+  --primary: #2563eb;
+  --primary-weak: #eff6ff;
+  --green: #16a34a;
+  --green-weak: #f0fdf4;
+  --red: #dc2626;
+  --red-weak: #fef2f2;
+  --amber: #d97706;
+  --shadow: 0 1px 3px rgba(15, 23, 42, .06), 0 1px 2px rgba(15, 23, 42, .04);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.num, .mono {
+  font-family: "SF Mono", "JetBrains Mono", Menlo, Consolas, "Courier New", monospace;
+  font-variant-numeric: tabular-nums;
+}
+.container { max-width: 1100px; margin: 0 auto; padding: 20px 16px 60px; }
+
+/* 顶栏 */
+.header {
+  display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: 10px; margin-bottom: 18px;
+}
+.header h1 { font-size: 20px; font-weight: 700; letter-spacing: .5px; }
+.header h1 .logo { color: var(--primary); margin-right: 6px; }
+.header .sub { font-size: 12px; color: var(--text-sub); margin-top: 2px; }
+.header-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* 卡片 */
+.card {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 12px; box-shadow: var(--shadow); padding: 20px; margin-bottom: 18px;
+}
+.card-title {
+  font-size: 15px; font-weight: 600; margin-bottom: 14px;
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+}
+.card-title::before {
+  content: ""; display: inline-block; width: 4px; height: 16px;
+  background: var(--primary); border-radius: 2px;
+}
+.card-title .tag {
+  font-size: 11px; font-weight: 500; color: var(--primary);
+  background: var(--primary-weak); border-radius: 10px; padding: 2px 8px;
+}
+
+/* 计算器布局 */
+.calc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 860px) { .calc-grid { grid-template-columns: 1fr; } }
+.panel {
+  border: 1px solid var(--border); border-radius: 10px; padding: 16px; background: #fbfcfe;
+}
+.panel-upstream { border-top: 3px solid var(--primary); }
+.panel-downstream { border-top: 3px solid var(--amber); }
+.panel h3 { font-size: 13px; font-weight: 600; color: var(--text-sub); margin-bottom: 12px; letter-spacing: 1px; }
+
+/* 表单 */
+.field { margin-bottom: 14px; }
+.field label { display: block; font-size: 12px; color: var(--text-sub); margin-bottom: 4px; }
+.field .hint { font-size: 11px; color: var(--text-light); margin-top: 3px; }
+.input-wrap { display: flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: #fff; }
+.input-wrap:focus-within { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(37, 99, 235, .12); }
+.input-wrap.invalid { border-color: var(--red); box-shadow: 0 0 0 3px rgba(220, 38, 38, .1); }
+.input-wrap .prefix {
+  padding: 8px 10px; background: #f1f5f9; color: var(--text-sub);
+  font-size: 13px; border-right: 1px solid var(--border); white-space: nowrap; min-width: 52px; text-align: center;
+}
+.input-wrap input, .input-wrap select {
+  flex: 1; border: none; outline: none; padding: 8px 10px; font-size: 14px;
+  font-family: "SF Mono", Menlo, Consolas, monospace; font-variant-numeric: tabular-nums; width: 100%;
+  background: transparent; color: var(--text);
+}
+.input-wrap select { font-family: inherit; cursor: pointer; }
+.input-wrap input:disabled { color: var(--text-sub); background: #f8fafc; cursor: not-allowed; }
+.field .err { font-size: 11px; color: var(--red); margin-top: 3px; display: none; }
+.field.invalid .err { display: block; }
+
+/* 结果区 */
+.result-row {
+  display: flex; align-items: baseline; justify-content: space-between;
+  padding: 8px 0; border-bottom: 1px dashed var(--border);
+}
+.result-row:last-child { border-bottom: none; }
+.result-row .label { font-size: 12px; color: var(--text-sub); }
+.result-row .value { font-size: 16px; font-weight: 600; }
+.result-row .formula { font-size: 11px; color: var(--text-light); display: block; margin-top: 2px; text-align: right; }
+.value.recv { color: var(--primary); }
+.value.pay { color: var(--amber); }
+
+/* 毛利条 */
+.profit-bar {
+  margin-top: 16px; background: var(--green-weak); border: 1px solid #bbf7d0;
+  border-radius: 10px; padding: 14px 18px;
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;
+}
+.profit-bar .pl { font-size: 13px; font-weight: 600; color: #14532d; }
+.profit-bar .pv { font-size: 26px; font-weight: 700; color: var(--green); }
+.profit-bar .pf { font-size: 11px; color: #4d7c5f; }
+.invalid-notice {
+  margin-top: 16px; background: var(--red-weak); border: 1px solid #fecaca;
+  border-radius: 10px; padding: 10px 14px; font-size: 12px; color: var(--red); display: none;
+}
+
+/* 按钮 */
+.btn {
+  border: none; border-radius: 8px; padding: 8px 16px; font-size: 13px; font-weight: 500;
+  cursor: pointer; transition: all .15s; font-family: inherit;
+}
+.btn-primary { background: var(--primary); color: #fff; }
+.btn-primary:hover { background: #1d4ed8; }
+.btn-outline { background: #fff; color: var(--text-sub); border: 1px solid var(--border); }
+.btn-outline:hover { border-color: var(--primary); color: var(--primary); }
+.btn-danger { background: #fff; color: var(--red); border: 1px solid #fecaca; }
+.btn-danger:hover { background: var(--red-weak); }
+.btn-green { background: var(--green); color: #fff; }
+.btn-green:hover { background: #15803d; }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.actions { display: flex; gap: 10px; margin-top: 16px; flex-wrap: wrap; align-items: center; }
+.actions .remark-input { flex: 1; min-width: 180px; }
+
+/* 费后汇率展示框（只读，点击复制） */
+.eff-rate-box {
+  margin-top: 10px; border: 1px dashed var(--border); background: #f8fafc;
+  border-radius: 8px; padding: 8px 12px; cursor: pointer; user-select: none; transition: all .15s;
+}
+.eff-rate-box:hover { border-color: var(--primary); background: #eff6ff; }
+.eff-rate-box.copied { border-color: var(--green); background: var(--green-weak); }
+.eff-rate-box .eff-rate-label { display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: var(--text-sub); }
+.eff-rate-box .copy-hint { color: var(--text-light); font-size: 10px; }
+.eff-rate-box .eff-rate-value { font-size: 15px; font-weight: 600; color: var(--primary); margin-top: 3px; }
+#effDownBox .eff-rate-value { color: var(--amber); }
+.eff-rate-box .eff-rate-sub { font-size: 10px; color: var(--text-light); margin-top: 2px; }
+
+/* 备注常用选项 */
+.remark-wrap { position: relative; flex: 1; min-width: 230px; display: flex; gap: 6px; }
+.remark-wrap input { flex: 1; border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; font-size: 13px; outline: none; font-family: inherit; }
+.remark-preset-btn { padding: 8px 10px; font-size: 12px; white-space: nowrap; }
+.remark-menu, .rule-menu {
+  display: none; position: absolute; top: calc(100% + 6px); left: 0; width: 100%; min-width: 250px;
+  max-height: 260px; overflow: auto; background: #fff; border: 1px solid var(--border);
+  border-radius: 10px; box-shadow: 0 8px 24px rgba(15, 23, 42, .12); z-index: 60; padding: 6px;
+}
+.remark-menu.open, .rule-menu.open { display: block; }
+.remark-menu .rm-item, .rule-menu .rm-item { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 10px; border-radius: 7px; cursor: pointer; font-size: 13px; }
+.remark-menu .rm-item:hover, .rule-menu .rm-item:hover { background: #eff6ff; }
+.remark-menu .rm-item .rm-text, .rule-menu .rm-item .rm-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.remark-menu .rm-del, .rule-menu .rm-del { border: none; background: none; color: var(--text-light); cursor: pointer; font-size: 15px; padding: 0 5px; border-radius: 4px; line-height: 1; flex: none; }
+.remark-menu .rm-del:hover, .rule-menu .rm-del:hover { color: var(--red); background: var(--red-weak); }
+.remark-menu .rm-add { display: block; width: 100%; text-align: left; border: 1px dashed var(--border); background: none; border-radius: 7px; padding: 7px 10px; font-size: 12px; color: var(--primary); cursor: pointer; margin-top: 4px; font-family: inherit; }
+.remark-menu .rm-add:hover { background: #eff6ff; }
+.remark-menu .rm-empty, .rule-menu .rm-empty { font-size: 12px; color: var(--text-light); padding: 8px 10px; }
+
+/* 统计卡片 */
+.stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; }
+@media (max-width: 860px) { .stat-grid { grid-template-columns: repeat(2, 1fr); } }
+.stat-card {
+  background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+  padding: 14px 16px; box-shadow: var(--shadow);
+}
+.stat-card .sk { font-size: 12px; color: var(--text-sub); margin-bottom: 6px; }
+.stat-card .sv { font-size: 18px; font-weight: 700; }
+.stat-card .sv.green { color: var(--green); }
+
+/* 筛选行 */
+.filter-bar { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; align-items: center; }
+.filter-bar input, .filter-bar select {
+  border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px; font-size: 13px;
+  outline: none; background: #fff; color: var(--text); font-family: inherit;
+}
+.filter-bar input:focus, .filter-bar select:focus { border-color: var(--primary); }
+
+/* 表格 */
+.table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 10px; background: #fff; }
+table { width: 100%; border-collapse: collapse; font-size: 12.5px; min-width: 1180px; }
+thead th {
+  background: #f8fafc; color: var(--text-sub); font-weight: 600; text-align: left;
+  padding: 10px 12px; border-bottom: 1px solid var(--border); white-space: nowrap; position: sticky; top: 0;
+}
+tbody td { padding: 9px 12px; border-bottom: 1px solid #f1f5f9; white-space: nowrap; }
+tbody tr:hover { background: #f8fbff; }
+tbody td.num-cell { font-family: "SF Mono", Menlo, Consolas, monospace; font-variant-numeric: tabular-nums; }
+td.gross-pos { color: var(--green); font-weight: 600; }
+td.gross-neg { color: var(--red); font-weight: 600; }
+.del-btn {
+  border: none; background: none; color: var(--red); cursor: pointer; font-size: 12px; padding: 2px 6px;
+  border-radius: 4px;
+}
+.del-btn:hover { background: var(--red-weak); }
+.empty-tip { text-align: center; color: var(--text-light); padding: 30px 0; font-size: 13px; }
+
+/* 弹窗 */
+.modal-mask {
+  position: fixed; inset: 0; background: rgba(15, 23, 42, .45);
+  display: none; align-items: center; justify-content: center; z-index: 100; padding: 16px;
+}
+.modal-mask.show { display: flex; }
+.modal {
+  background: #fff; border-radius: 12px; padding: 22px; width: 380px; max-width: 100%;
+  box-shadow: 0 10px 40px rgba(15, 23, 42, .2);
+}
+.modal h4 { font-size: 15px; margin-bottom: 12px; }
+.modal p { font-size: 13px; color: var(--text-sub); margin-bottom: 16px; }
+.modal .modal-actions { display: flex; justify-content: flex-end; gap: 10px; }
+.currency-form .field-row { display: flex; gap: 10px; }
+.currency-form .field-row .field { flex: 1; }
+.currency-form input {
+  width: 100%; border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px;
+  font-size: 13px; outline: none;
+}
+.currency-form input:focus { border-color: var(--primary); }
+.currency-form .err-tip { color: var(--red); font-size: 11px; margin-top: 8px; display: none; }
+
+/* ===== v7：实收/实付点击复制 ===== */
+.value.copyable { cursor: pointer; }
+.value.copyable:hover { text-decoration: underline dotted; text-underline-offset: 3px; }
+.value.recv.copied, .value.pay.copied { color: var(--green); }
+.value.copyable.copied::after { content: ' ✓'; font-size: 12px; font-weight: 500; }
+
+/* ===== v7：结算规则栏（费率方案预设） ===== */
+.rule-bar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
+.rule-bar input {
+  border: 1px solid var(--border); border-radius: 8px; padding: 7px 10px; font-size: 13px;
+  outline: none; font-family: inherit; width: 230px;
+}
+.rule-bar input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(37, 99, 235, .12); }
+.rule-wrap { position: relative; }
+
+/* ===== v7：工单按钮 ===== */
+.ticket-gen { padding: 5px 12px; font-size: 12px; margin-top: 10px; }
+.ticket-btn {
+  border: none; background: none; color: var(--primary); cursor: pointer; font-size: 12px;
+  padding: 2px 6px; border-radius: 4px; font-family: inherit;
+}
+.ticket-btn:hover { background: var(--primary-weak); }
+
+/* ===== v7：工单弹窗 ===== */
+.ticket-modal { width: 480px; }
+.ticket-pre {
+  background: #f8fafc; border: 1px solid var(--border); border-radius: 8px;
+  padding: 14px 16px; font-size: 12.5px; line-height: 1.75; white-space: pre-wrap;
+  word-break: break-all; max-height: 56vh; overflow-y: auto; margin-bottom: 16px;
+  font-family: "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+  font-variant-numeric: tabular-nums; color: var(--text);
+}
+
+footer { text-align: center; font-size: 11px; color: var(--text-light); margin-top: 30px; }
+
+/* ===== 货币搜索选择框（可搜索下拉） ===== */
+.cur-picker { position: relative; display: inline-flex; }
+.cur-btn {
+  border: none; background: #f1f5f9; color: var(--text-sub); font-size: 13px;
+  padding: 8px 10px; cursor: pointer; border-right: 1px solid var(--border);
+  white-space: nowrap; min-width: 66px; text-align: center; font-family: inherit;
+  display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+}
+.cur-btn::after { content: '▾'; font-size: 10px; color: var(--text-light); }
+.cur-btn:hover { color: var(--primary); }
+.cur-drop {
+  display: none; position: absolute; top: calc(100% + 4px); left: 0; width: 270px;
+  background: #fff; border: 1px solid var(--border); border-radius: 8px;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, .15); z-index: 60; padding: 8px;
+}
+.cur-drop.open { display: block; }
+.cur-search {
+  width: 100%; border: 1px solid var(--border); border-radius: 6px;
+  padding: 6px 8px; font-size: 13px; outline: none; margin-bottom: 6px;
+}
+.cur-search:focus { border-color: var(--primary); }
+.cur-list { max-height: 250px; overflow-y: auto; }
+.cur-item { padding: 7px 8px; font-size: 13px; border-radius: 6px; cursor: pointer; display: flex; justify-content: space-between; gap: 8px; }
+.cur-item:hover { background: #f1f5f9; }
+.cur-item.sel { background: var(--primary-weak); color: var(--primary); font-weight: 600; }
+.cur-item .ci-name { color: var(--text-sub); font-size: 12px; }
+.cur-empty { padding: 12px; text-align: center; color: var(--text-light); font-size: 12px; }
+
+/* 结算货币选择（毛利条内，小尺寸） */
+#curToPicker .cur-btn {
+  background: #fff; border: 1px solid var(--border); border-radius: 6px;
+  padding: 2px 8px; font-size: 12px; color: var(--text-sub); min-width: 60px;
+}
+#curToPicker .cur-btn::after { font-size: 9px; }
+.pf-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 2px; }
+.pf-label { font-size: 12px; color: var(--text-light); }
+
+/* Gas Fee 选项 */
+.gas-opt { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--text-sub); margin-top: 5px; cursor: pointer; user-select: none; }
+.gas-opt input { cursor: pointer; }
+.gas-tag { display: inline-block; font-size: 10px; color: #b45309; background: #fef3c7; border-radius: 8px; padding: 1px 6px; margin-left: 4px; }
+
+/* 账本总计行 */
+table tfoot td {
+  position: sticky; bottom: 0; background: #f8fafc; font-weight: 600;
+  border-top: 2px solid var(--border); font-size: 12px; white-space: nowrap;
+}
+
+
+/* v8 抬头/批次 */
+.meta-bar { display: flex; gap: 10px; margin: 12px 0 10px; flex-wrap: wrap; }
+.meta-bar input { flex: 1; min-width: 180px; border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; font-size: 13px; outline: none; font-family: inherit; }
+
+/* v8 规则栏扩展 */
+.rule-bar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; padding: 10px 12px; background: #f8fafc; border: 1px dashed var(--border); border-radius: 10px; }
+.rule-bar input#ruleName { flex: 1; min-width: 160px; border: 1px solid var(--border); border-radius: 6px; padding: 7px 10px; font-size: 13px; outline: none; font-family: inherit; }
+.rule-bar .use-prev-rate { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--text-sub); cursor: pointer; user-select: none; }
+.rule-bar .use-prev-rate input { cursor: pointer; }
+
+/* v10 下游商户输入框（每条规则可单独填写，工单按商户分组） */
+.rule-bar input#merchant { width: 190px; min-width: 150px; border: 1px solid var(--border); border-radius: 6px; padding: 7px 10px; font-size: 13px; outline: none; font-family: inherit; }
+.rule-bar input#merchant:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(37, 99, 235, .12); }
+
+/* v8 全局面板 */
+.panel-global { grid-column: 1 / -1; background: #fff; border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
+.panel-global h3 { font-size: 14px; margin: 0 0 12px; color: var(--text); }
+@media (min-width: 760px) {
+  .panel-global { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .panel-global h3 { grid-column: 1 / -1; }
+  .panel-global #f-amounts { grid-column: 1 / -1; }
+}
+
+/* 动态金额输入 */
+#amountList { display: flex; flex-direction: column; gap: 6px; }
+.amount-item { display: flex; align-items: center; gap: 8px; }
+.amount-no { font-size: 12px; color: var(--text-light); width: 22px; text-align: right; }
+.amount-input { flex: 1; border: 1px solid var(--border); border-radius: 6px; padding: 7px 10px; font-size: 13px; outline: none; font-family: inherit; }
+.amount-input:focus { border-color: var(--primary); }
+#f-amounts .hint { font-size: 11px; color: var(--text-light); margin-left: 6px; font-weight: normal; }
+
+/* 工单草稿 */
+#draftCard { margin-bottom: 16px; }
+.draft-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+.draft-item { border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; background: #f8fafc; }
+.draft-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+.draft-name { font-weight: 600; font-size: 13px; color: var(--text); }
+.draft-meta { font-size: 12px; color: var(--text-sub); }
+.draft-totals { font-size: 12px; color: var(--text); margin-top: 6px; }
+.draft-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* 复制反馈 */
+.value.copyable { cursor: pointer; border-bottom: 1px dashed rgba(0,0,0,.15); }
+.value.copyable:hover { opacity: .85; }
+.value.recv.copied, .value.pay.copied { color: var(--green); border-bottom-color: var(--green); }
+
+/* 按钮小尺寸 */
+.btn-xs { padding: 4px 8px; font-size: 12px; }
+
+/* v8 汇率行内原始货币选择框 */
+.rate-row { display: flex; gap: 8px; align-items: stretch; }
+.rate-row .cur-picker { flex: none; }
+.rate-row .cur-btn { background: #f1f5f9; border: 1px solid var(--border); border-radius: 8px; min-width: 82px; }
+.rate-row .input-wrap { flex: 1; }
+</style>
+</head>
+<body data-page-node-id="LRSEOV7YvRTlOGxJdEJrbD">
+<div class="container" data-page-node-id="y7YnUS30PHHgsrbvwlaqpV">
+
+  <!-- 顶栏 -->
+  <div class="header" data-page-node-id="y4hj3Gi34BB6jtfKwBdXjU">
+    <div data-page-node-id="fUV1CUWxtbA7ohFyQGVGuO">
+      <h1 data-page-node-id="2CxTTlkD1fxPmMb7sUG9Fe"><span class="logo" data-page-node-id="t9z5dONjwS0aqtqLCFGIut">◈</span><span data-i18n="app.name">费率结算自动计算器</span> <span id="appVerBadge" style="font-size:12px;font-weight:700;color:#0369a1;background:#e0f2fe;border:1px solid #7dd3fc;border-radius:999px;padding:2px 10px;margin-left:8px;vertical-align:middle;letter-spacing:.5px;">v11</span><select id="langSelect" onchange="onLangChange(this.value)" title="Language / 语言" style="font-size:12px;font-weight:500;color:#0369a1;background:#e0f2fe;border:1px solid #7dd3fc;border-radius:999px;padding:2px 8px;margin-left:6px;vertical-align:middle;outline:none;cursor:pointer;font-family:inherit;"><option value="zh">中文</option><option value="en">English</option><option value="ms">Bahasa Melayu</option><option value="vi">Tiếng Việt</option></select></h1>
+      <div class="sub" data-i18n="app.sub" data-page-node-id="lYrgnNUGlxxFTWIQiTcidi">代收订单上下游结算 &amp; 记账（数据保存在本地浏览器）</div>
+    </div>
+    <div class="header-actions" data-page-node-id="HK5EesekBC8eFM1davQBYO">
+      <button class="btn btn-outline" onclick="openCurrencyModal()" data-i18n="btn.customCur" data-page-node-id="IrncQaIAe41iCQlvrLmkPF">＋ 自定义货币</button>
+      <button class="btn btn-outline" onclick="openGithubModal()" data-i18n="btn.cloudBackup">☁ 云备份</button>
+      <button class="btn btn-outline" onclick="exportRules()" data-i18n="btn.exportRules">导出规则</button>
+      <button class="btn btn-outline" onclick="exportLedgerJSON()" data-i18n="btn.exportLedger">导出账目</button>
+      <button class="btn btn-outline" onclick="document.getElementById('importFile').click()" data-i18n="btn.import">导入</button>
+      <input type="file" id="importFile" accept=".json" style="display:none;" onchange="handleImport(this)">
+      <button class="btn btn-outline" onclick="exportCSV()" data-i18n="btn.exportCsv" data-page-node-id="tHkc2KE1nYBABmvgKKMrE6">导出 CSV</button>
+      <button class="btn btn-danger" onclick="confirmClearAll()" data-i18n="btn.clearLedger" data-page-node-id="ZEF8BwKXSF65Sh5HGYwBFl">清空账本</button>
+    </div>
+  </div>
+
+  <!-- ============ 1. 计算器 ============ -->
+  <div class="card" data-page-node-id="PbHDBA1fDF75PMfu8NsgXU">
+    <div class="card-title" data-page-node-id="Y5U0AzWPF1XcBGlpAammhN"><span data-i18n="calc.title">代收订单计算器</span> <span class="tag" data-i18n="calc.tag" data-page-node-id="hVFUAfNKWVeOaT1ADhqGYo">输入即算</span></div>
+
+    <!-- 我方抬头 / 批次（v10：仅入账与汇总工单使用，不出现在上游工单；商户名移至规则栏「下游商户」） -->
+    <div class="meta-bar" id="metaBar">
+      <input type="text" id="header" data-i18n-ph="ph.header" placeholder="我方抬头（选填，仅入账/汇总工单使用）">
+      <input type="text" id="batch" data-i18n-ph="ph.batch" placeholder="批次号（如：0920-A）">
+    </div>
+
+    <!-- 结算规则栏（v7/v8/v10：费率方案预设 + 下游商户） -->
+    <div class="rule-bar" id="ruleBar">
+      <input type="text" id="ruleName" data-i18n-ph="ph.ruleName" placeholder="规则/业务名，如：欧洲A方案" maxlength="30">
+      <input type="text" id="merchant" data-i18n-ph="ph.merchant" placeholder="下游商户（如：EC Markets）" maxlength="30">
+      <button type="button" class="btn btn-outline" id="ruleSaveBtn" data-i18n="btn.saveRule" onclick="saveRulePreset()">💾 存为规则</button>
+      <span class="rule-wrap">
+        <button type="button" class="btn btn-outline" data-i18n="btn.applyRule" onclick="toggleRuleMenu(event)">套用规则 ▾</button>
+        <div class="rule-menu" id="ruleMenu"></div>
+      </span>
+      <button type="button" class="btn btn-outline" data-i18n="btn.addNextRule" onclick="addRuleToDraft()">＋ 添加下一规则</button>
+      <label class="use-prev-rate"><input type="checkbox" id="usePrevRate" onchange="onUsePrevRate()"> <span data-i18n="opt.usePrevRate">套用前项汇率</span></label>
+    </div>
+
+    <div class="calc-grid" data-page-node-id="6GZoF7mtpIAcehkzJ6NM7D">
+      <!-- 全局输入：汇率 + 动态金额 -->
+      <div class="panel panel-global">
+        <h3 data-i18n="panel.global">全局参数</h3>
+        <div class="field" id="f-rate">
+          <label>汇率（原始货币 → 结算货币）</label>
+          <div class="rate-row">
+            <span id="curFromPicker"></span>
+            <div class="input-wrap">
+              <input type="text" id="rate" placeholder="如 1.08（参考值，以实际为准）" oninput="recalc()">
+            </div>
+          </div>
+          <div class="err" data-i18n="err.ratePositive">汇率必须为正数</div>
+        </div>
+        <div class="field" id="f-amounts">
+          <label><span data-i18n="label.amounts">金额（原始货币）</span><span class="hint" data-i18n="hint.amounts">输入正数后自动增加下一行；输入 0 不新增</span></label>
+          <div id="amountList"></div>
+          <div class="err" data-i18n="err.amounts">请至少输入一笔有效金额</div>
+        </div>
+      </div>
+
+      <!-- 上游结算 -->
+      <div class="panel panel-upstream" data-page-node-id="hYRSdx7ey1ABLJEzvHWmE7">
+        <h3 data-i18n="panel.up" data-page-node-id="oJpuRYepO1mjWNtT43E2V7">上游结算（我们 ← 上游）</h3>
+        <div class="field" id="f-feeUp" data-page-node-id="z7nyZ5cIAkCj8HfjAFp6sw">
+          <label data-i18n="label.feeUp" data-page-node-id="EV7zqybZF9GH9dMf4h72nf">上游手续费率（%）</label>
+          <div class="input-wrap" data-page-node-id="xYJYmLrY5cnXsB5XmgQKFM">
+            <input type="text" id="feeUp" data-i18n-ph="ph.fee" placeholder="如 0.5（留空 = 0）" oninput="recalc()" data-page-node-id="39P1I24qXKv6A4lGVIBDNg">
+            <span class="prefix" style="border-left:1px solid var(--border);border-right:none;background:#f1f5f9;" data-page-node-id="UPnJ2XXhtcfZ5BTs08DPKd">%</span>
+          </div>
+          <div class="err" data-i18n="err.feeRange" data-page-node-id="Hi4PFUKCFAksPjPqoZlLel">费率需在 0 – 100 之间</div>
+        </div>
+        <div class="field" id="f-adjUp">
+          <label><span id="adjUpLabel">上游汇率单价调整（每 1 EUR ± USDT）</span></label>
+          <div class="input-wrap">
+            <input type="text" id="adjUp" data-i18n-ph="ph.adj" placeholder="如 +0.5 / -0.3，不加则留空" oninput="recalc()">
+            <span class="prefix" style="border-left:1px solid var(--border);border-right:none;background:#f1f5f9;">±</span>
+          </div>
+          <div class="err" data-i18n="err.adj">调整值须为数字；且 汇率+调整 后须为正数</div>
+        </div>
+        <div class="eff-rate-box" id="effUpBox" onclick="copyEffRate('effUpBox', 'effUpVal')" data-i18n-title="title.copyEffRate" title="点击复制费后汇率">
+          <div class="eff-rate-label"><span id="effUpLabel">上游费后汇率（每 1 EUR 实得 USDT）</span><span class="copy-hint" data-i18n="hint.clickCopy">点击复制</span></div>
+          <div class="eff-rate-value num" id="effUpVal">—</div>
+          <div class="eff-rate-sub" id="effUpSub"></div>
+        </div>
+        <div class="result-row" data-page-node-id="gscFTAqHTrtsDmpEUhWyvs">
+          <span class="label" data-i18n="label.subRecv" data-page-node-id="m3plNFh6X00IjsrvfQL8Rh">小计实收（我方收入）</span>
+          <span data-page-node-id="grdSEdkCgGv2bRNjHetRBE">
+            <span class="value recv num copyable" id="recvVal" onclick="copyValue('recvVal')" data-i18n-title="title.copyRecv" title="点击复制实收金额" data-page-node-id="vQjn8P5MM0sxBKqIdGXtqA">—</span>
+            <span class="formula" id="recvFormula" data-page-node-id="Ff57ddKhsUzs1JTQIxskew">实收 = Σ(金额 × 汇率 × (1 − 上游费率))</span>
+          </span>
+        </div>
+        <button type="button" class="btn btn-outline ticket-gen" data-i18n="btn.genUpTicket" onclick="showUpstreamTicket()">📋 生成上游工单</button>
+      </div>
+
+      <!-- 下游结算 -->
+      <div class="panel panel-downstream" data-page-node-id="qTgZLlvUp1ExXHlVacMEFW">
+        <h3 data-i18n="panel.down" data-page-node-id="9Xm7f6e6QSyiKioCmWbUHk">下游结算（我们 → 下游）</h3>
+        <div class="field" id="f-feeDown" data-page-node-id="DqXEmxRyARm4DrqVNXERug">
+          <label data-i18n="label.feeDown" data-page-node-id="Jv83bnrRaDrq066uHSeNos">我方收取下游的手续费率（%）</label>
+          <div class="input-wrap" data-page-node-id="nvbebzWrhG0w7fD4qUj5wj">
+            <input type="text" id="feeDown" data-i18n-ph="ph.fee" placeholder="如 1.2（留空 = 0）" oninput="recalc()" data-page-node-id="P2QZSin1AsNXnvLY3ZDhId">
+            <span class="prefix" style="border-left:1px solid var(--border);border-right:none;background:#f1f5f9;" data-page-node-id="NMsglGHgiH4ECwkgSQJdWb">%</span>
+          </div>
+          <div class="err" data-i18n="err.feeRange" data-page-node-id="2kPTUPUBvsMkC3OPiZtTWA">费率需在 0 – 100 之间</div>
+        </div>
+        <div class="field" id="f-adjDown">
+          <label><span id="adjDownLabel">下游汇率单价调整（每 1 EUR ± USDT）</span></label>
+          <div class="input-wrap">
+            <input type="text" id="adjDown" data-i18n-ph="ph.adj" placeholder="如 +0.5 / -0.3，不加则留空" oninput="recalc()">
+            <span class="prefix" style="border-left:1px solid var(--border);border-right:none;background:#f1f5f9;">±</span>
+          </div>
+          <div class="err" data-i18n="err.adj">调整值须为数字；且 汇率+调整 后须为正数</div>
+        </div>
+        <div class="eff-rate-box" id="effDownBox" onclick="copyEffRate('effDownBox', 'effDownVal')" data-i18n-title="title.copyEffRate" title="点击复制费后汇率">
+          <div class="eff-rate-label"><span id="effDownLabel">下游费后汇率（每 1 EUR 支付 USDT）</span><span class="copy-hint" data-i18n="hint.clickCopy">点击复制</span></div>
+          <div class="eff-rate-value num" id="effDownVal">—</div>
+          <div class="eff-rate-sub" id="effDownSub"></div>
+        </div>
+        <div class="result-row" data-page-node-id="uB22CHbZ0JjtR2N7AKKZOp">
+          <span class="label" data-i18n="label.subPay" data-page-node-id="qEBwU6XH9cBohgLnmitOuY">小计实付（付给下游）</span>
+          <span data-page-node-id="oQM84ATrrwfDEaQ94YujWM">
+            <span class="value pay num copyable" id="payVal" onclick="copyValue('payVal')" data-i18n-title="title.copyPay" title="点击复制实付金额" data-page-node-id="u5pLdHoDAs29BG8XKvWBSG">—</span>
+            <span class="formula" id="payFormula" data-page-node-id="1SYwavx0DLkgyO328EGjTc">实付 = Σ(金额 × 汇率 × (1 − 我方费率))</span>
+          </span>
+        </div>
+        <button type="button" class="btn btn-outline ticket-gen" data-i18n="btn.genDownTicket" onclick="showDownstreamTicket()">📋 生成下游工单</button>
+      </div>
+    </div>
+
+    <!-- 毛利 -->
+    <div class="profit-bar" id="profitBar" data-page-node-id="Ww6wRcMg0aJBXI7FkDiUxJ">
+      <div data-page-node-id="6OD7jgEhn4ROkzBeyYAT27">
+        <div class="pl" data-i18n="label.profit" data-page-node-id="Baxvtgm6GT2AmigRq7V4rA">毛利（实收 − 实付）</div>
+        <div class="pf-row">
+          <span class="pf-label" data-i18n="label.settleCur">结算货币：</span>
+          <span class="cur-picker cur-to" id="curToPicker"></span>
+          <span class="pf" data-page-node-id="wzKn4gPIrOClubfHvCJ0Gc">· 正数为盈利</span>
+        </div>
+        <label class="gas-opt"><input type="checkbox" id="gasFee" onchange="recalc()"> <span data-i18n="opt.gasFee">商户承担 Gas Fee（实付另扣 1.2U）</span></label>
+      </div>
+      <div class="pv num" id="profitVal" data-page-node-id="NfpJaTO7SMWhmiYOramVFv">—</div>
+    </div>
+    <div class="invalid-notice" id="invalidNotice" data-i18n="notice.invalid" data-page-node-id="iPpKURhP9VGNyW3uKDKR5t">请修正上方标红的输入项后再进行计算与入账。</div>
+
+    <!-- 入账操作 -->
+    <div class="actions" data-page-node-id="nLKWavHLFGzJ5Qps4GjCzQ">
+      <div class="remark-wrap">
+        <input type="text" id="remark" data-i18n-ph="ph.remark" placeholder="备注（选填，如：5月第1批结算）"
+               onfocus="this.style.borderColor='var(--primary)'" onblur="this.style.borderColor='var(--border)'"
+               data-page-node-id="lUHyOBDzR0T3fvgYIiQH3r">
+        <button type="button" class="btn btn-outline remark-preset-btn" data-i18n="btn.remarkPresets" onclick="toggleRemarkMenu(event)">常用 ▾</button>
+        <div class="remark-menu" id="remarkMenu"></div>
+      </div>
+      <button class="btn btn-green" id="btnPost" data-i18n="btn.post" onclick="postToLedger()" data-page-node-id="MoaNOmDl0uxAtiW5IDGvEl">✓ 一键入账</button>
+      <button class="btn btn-outline" data-i18n="btn.reset" onclick="resetCalculator()" data-page-node-id="Fba6xEHBpHwPg9FzEaPpGD">重置</button>
+      <span style="font-size:11px;color:var(--text-light);" data-i18n="hint.post" data-page-node-id="BSzM7Dc59BIgGnVm2PR623">无草稿时入账当前规则；有草稿时一键入账全部规则（按各规则的下游商户记账）</span>
+    </div>
+  </div>
+
+  <!-- ============ 2.5 工单草稿（v8） ============ -->
+  <div class="card" id="draftCard">
+    <div class="card-title"><span data-i18n="draft.title">工单草稿</span> <span class="tag" id="draftCount">0 条规则</span></div>
+    <div id="draftList" class="draft-list"></div>
+    <div class="draft-actions">
+      <button type="button" class="btn btn-outline" data-i18n="btn.upTicket" onclick="showUpstreamTicket()">📋 上游工单</button>
+      <button type="button" class="btn btn-outline" data-i18n="btn.downTicket" onclick="showDownstreamTicket()">📋 下游工单</button>
+      <button type="button" class="btn btn-outline" data-i18n="btn.combinedTicket" onclick="showCombinedTicket()">📋 汇总工单</button>
+      <button type="button" class="btn btn-outline" data-i18n="btn.clearDraft" onclick="clearDraft()">清空草稿</button>
+    </div>
+  </div>
+
+  <!-- ============ 2. 统计卡片 ============ -->
+  <div class="stat-grid" id="statGrid" data-page-node-id="YDT1YJ6VCTIdGWDrCLBKuB">
+    <div class="stat-card" data-page-node-id="DxscvmOOObj6XxoHtAvxJt"><div class="sk" data-i18n="stat.count" data-page-node-id="FRducP4UcvO1jPNHo5JfVc">总笔数</div><div class="sv num" id="statCount" data-page-node-id="Y1HdByGrgHtVcNUl65feh7">0</div></div>
+    <div class="stat-card" data-page-node-id="ymFkzSb6uPkTkDjHpE9WBq"><div class="sk" data-i18n="stat.recv" data-page-node-id="AakH1teZKZJnNygbcpXCtc">总实收</div><div class="sv num" id="statRecv" data-page-node-id="39HkBHwcMqmTNxFxlNeE9l">—</div></div>
+    <div class="stat-card" data-page-node-id="25eyy2prpiseCMBA6JJhng"><div class="sk" data-i18n="stat.pay" data-page-node-id="1nkWk46g4RoRVANccOy3nt">总实付</div><div class="sv num" id="statPay" data-page-node-id="5frNWUyb0EAvR631SB1wM0">—</div></div>
+    <div class="stat-card" data-page-node-id="uCJ0DkI9RK4bKr0cBJjlAQ"><div class="sk" data-i18n="stat.gross" data-page-node-id="enngHpQEoKcmyY4x6PYcEq">总毛利</div><div class="sv num green" id="statGross" data-page-node-id="lmUoBs1YAc0daQN8S6AETu">—</div></div>
+  </div>
+
+  <!-- ============ 3. 账本 ============ -->
+  <div class="card" data-page-node-id="8aFxjrAVQqB44tI5SPHKwR">
+    <div class="card-title" data-page-node-id="TjqM292LMT4SkMGoQWxNV4"><span data-i18n="ledger.title">记账本</span> <span class="tag" id="ledgerCountTag" data-page-node-id="tGfZg5zfWmWEzZubHLAYb5">0 笔</span></div>
+    <div class="filter-bar" data-page-node-id="awq3DBbTHGxEbD5Z3L0ljd">
+      <input type="text" id="filterKeyword" data-i18n-ph="ph.filter" placeholder="按备注 / 抬头 / 商户 / 批次 / 规则 / 工单号筛选" oninput="renderLedger()" style="min-width:180px;" data-page-node-id="ebhEzuxK80q5JdwaQEOJym">
+      <input type="date" id="filterFrom" onchange="renderLedger()" data-page-node-id="JN3DuiObVydQLGleHWljBy">
+      <span style="color:var(--text-light);" data-i18n="filter.to" data-page-node-id="ftlh6kkXn14dLH16hWPpmn">至</span>
+      <input type="date" id="filterTo" onchange="renderLedger()" data-page-node-id="wh1z4ezO5I8eyuBIJRHuQL">
+      <button class="btn btn-outline" data-i18n="btn.clearFilters" onclick="clearFilters()" data-page-node-id="3tBjsP1cAsJJDJWfAgydlq">清除筛选</button>
+    </div>
+    <div class="table-wrap" data-page-node-id="AuNBFcR32DvWUTl7RgdzqU">
+      <table data-page-node-id="woBYwkk8WIF4cmHtdHiIR0">
+        <thead data-page-node-id="A85oVWJswIh1FwtGWqLcUg">
+          <tr data-page-node-id="uuVEMB276wWEOWqrcqI8gY">
+            <th data-i18n="ledger.col.time">入账时间</th><th data-i18n="ledger.col.type">类型</th><th data-i18n="ledger.col.header">抬头</th><th data-i18n="ledger.col.merchant">商户</th><th data-i18n="ledger.col.batch">批次</th><th data-i18n="ledger.col.rule">业务规则</th><th data-i18n="ledger.col.amount">金额</th><th data-i18n="ledger.col.rate">汇率</th>
+            <th data-i18n="ledger.col.feeUp">上游费率</th><th data-i18n="ledger.col.feeDown">我方费率</th><th data-i18n="ledger.col.recv">实收</th><th data-i18n="ledger.col.pay">实付</th>
+            <th data-i18n="ledger.col.gross">毛利</th><th data-i18n="ledger.col.remark">备注</th><th data-i18n="ledger.col.actions">操作</th>
+          </tr>
+        </thead>
+        <tbody id="ledgerBody" data-page-node-id="tCz0AOTqArDuSRSLc33ZZ3"></tbody>
+        <tfoot id="ledgerFoot"></tfoot>
+      </table>
+    </div>
+    <div class="empty-tip" id="emptyTip" style="display:none;" data-i18n="ledger.empty" data-page-node-id="JBnXnTdCIqGnIkah4tIITo">暂无账目记录</div>
+  </div>
+
+  <footer data-i18n="app.footer" data-page-node-id="Cm2w3yK8X85KDclpY52PyA">费率结算自动计算器 · 单文件本地版 v11 · 数据存储于浏览器 localStorage，不会上传任何服务器</footer>
+</div>
+
+<!-- 自定义货币弹窗 -->
+<div class="modal-mask" id="currencyModal" data-page-node-id="RzSamQqCRaFWIHF5F1ue4a">
+  <div class="modal currency-form" data-page-node-id="AVZQNLtgEKorYTe03x8eBh">
+    <h4 data-i18n="cur.title" data-page-node-id="ynxaR4HunUl2n49vhspESR">添加自定义货币</h4>
+    <div class="field-row" data-page-node-id="sI5ESaLe8UGKZrWcy6mZUN">
+      <div class="field" data-page-node-id="fshQqgEdZLbfjopdkhOG1g">
+        <label style="font-size:12px;color:var(--text-sub);display:block;margin-bottom:4px;" data-i18n="cur.code" data-page-node-id="4jy1HsAQ8Qz5lXaDPLl8ng">货币代码</label>
+        <input type="text" id="newCurCode" maxlength="4" data-i18n-ph="ph.curCode" placeholder="如 THB" style="text-transform:uppercase;" data-page-node-id="PUk7UsYgBcPsxp1oXV6WFR">
+      </div>
+      <div class="field" data-page-node-id="NBrFCwY2jrV6iZavPsxHar">
+        <label style="font-size:12px;color:var(--text-sub);display:block;margin-bottom:4px;" data-i18n="cur.name" data-page-node-id="AViLGBBKz1RWwyiFqi5fij">货币名称</label>
+        <input type="text" id="newCurName" data-i18n-ph="ph.curName" placeholder="如 泰铢" data-page-node-id="YFcz61LjiSbBmEhH5yJuVc">
+      </div>
+    </div>
+    <div class="field" style="margin-top:4px;" data-page-node-id="vzpr1YeN8vkeMzBy49A4bp">
+      <label style="font-size:12px;color:var(--text-sub);display:block;margin-bottom:4px;" data-page-node-id="ra4S1j8HiOVwgWl8IS17Ai">
+        <input type="checkbox" id="newCurNoDecimal" data-page-node-id="CdjlwMi6wfIAmobJsElZcN"> <span data-i18n="cur.noDecimal">无小数货币（显示取整，如 JPY / KRW）</span>
+      </label>
+    </div>
+    <div class="err-tip" id="curErr" data-page-node-id="IbUOGa5CSXgkOMjpUqzFTX"></div>
+    <div class="modal-actions" data-page-node-id="56T6MAZf1EO7FeXpCePnQh">
+      <button class="btn btn-outline" data-i18n="btn.cancel" onclick="closeCurrencyModal()" data-page-node-id="GFmTP0LHJdFlOtiKyR7m5I">取消</button>
+      <button class="btn btn-primary" data-i18n="btn.add" onclick="addCurrency()" data-page-node-id="Bw2IoeQAXdaY2o0Sfe7CgW">添加</button>
+    </div>
+  </div>
+</div>
+
+<!-- 工单弹窗（v7：Telegram 制式纯文本） -->
+<div class="modal-mask" id="ticketModal">
+  <div class="modal ticket-modal">
+    <h4 id="ticketTitle">工单</h4>
+    <div data-i18n="ticketModal.hint" style="font-size:12px;color:#0369a1;background:#e0f2fe;border:1px dashed #7dd3fc;border-radius:6px;padding:4px 10px;margin:0 0 8px 0;">版本 v11 · 工单内所有数字均已用单反引号包裹，粘贴到 Telegram 后可逐个点按复制。若未见此提示，说明正在使用旧版页面，请关闭后重新打开 index.html。</div>
+    <pre class="ticket-pre" id="ticketText"></pre>
+    <div class="modal-actions">
+      <button class="btn btn-outline" data-i18n="btn.close" onclick="hideTicket()">关闭</button>
+      <button class="btn btn-primary" id="ticketCopyBtn" data-i18n="btn.copyTicket" onclick="copyTicketText()">复制工单</button>
+    </div>
+  </div>
+</div>
+
+<!-- GitHub 云备份设置（v9） -->
+<div class="modal-mask" id="githubModal">
+  <div class="modal" style="width:430px;">
+    <h4 data-i18n="gh.title">☁ GitHub 云备份</h4>
+    <p style="font-size:12px;line-height:1.6;" data-i18n="gh.desc">把 账目 / 规则 / 自定义货币 / 常用备注 备份到你自己的 GitHub 仓库（JSON 文件），换电脑、换浏览器时可恢复合并。Token 只保存在本机浏览器，不会发给任何第三方。</p>
+    <div class="field" style="margin-bottom:10px;">
+      <label data-i18n="gh.owner">GitHub 用户名（Owner）</label>
+      <div class="input-wrap"><input type="text" id="ghOwner" data-i18n-ph="ph.ghOwner" placeholder="如 octocat"></div>
+    </div>
+    <div class="field" style="margin-bottom:10px;">
+      <label data-i18n="gh.repo">仓库名（建议私有仓库）</label>
+      <div class="input-wrap"><input type="text" id="ghRepo" data-i18n-ph="ph.ghRepo" placeholder="如 fee-data"></div>
+    </div>
+    <div class="field" style="margin-bottom:10px;">
+      <label data-i18n="gh.branch">分支</label>
+      <div class="input-wrap"><input type="text" id="ghBranch" data-i18n-ph="ph.ghBranch" placeholder="main（默认）"></div>
+    </div>
+    <div class="field" style="margin-bottom:10px;">
+      <label data-i18n="gh.path">备份文件路径</label>
+      <div class="input-wrap"><input type="text" id="ghPath" data-i18n-ph="ph.ghPath" placeholder="fee-calculator/data.json（默认）"></div>
+    </div>
+    <div class="field" style="margin-bottom:6px;">
+      <label data-i18n="gh.token">Personal Access Token（勾选该仓库 Contents: Read and write 权限）</label>
+      <div class="input-wrap"><input type="password" id="ghToken" data-i18n-ph="ph.ghToken" placeholder="github_pat_… / ghp_…" autocomplete="off"></div>
+    </div>
+    <div id="ghStatus" style="font-size:12px;margin:8px 0;min-height:18px;color:var(--text-sub);"></div>
+    <div class="modal-actions" style="justify-content:space-between;flex-wrap:wrap;gap:8px;">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn btn-outline" data-i18n="btn.testConn" onclick="testGithubConn()">测试连接</button>
+        <button class="btn btn-primary" data-i18n="btn.backupNow" onclick="backupToGithub()">立即备份</button>
+        <button class="btn btn-green" data-i18n="btn.restore" onclick="restoreFromGithub()">从云端恢复</button>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-outline" data-i18n="btn.close" onclick="closeGithubModal()">关闭</button>
+        <button class="btn btn-primary" data-i18n="btn.saveSettings" onclick="saveGithubConfig()">保存设置</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 通用确认弹窗 -->
+<div class="modal-mask" id="confirmModal" data-page-node-id="LLRUwQnhDnL0Ud6upOBttA">
+  <div class="modal" data-page-node-id="9D1193q1hzsFVgJrzjypk2">
+    <h4 id="confirmTitle" data-page-node-id="Dnr8cOGhEeT9dhFWSVqyvP">确认</h4>
+    <p id="confirmMsg" data-page-node-id="Q60X2YqXlWQ9gNjw9ZMwLZ"></p>
+    <div class="modal-actions" data-page-node-id="1KEnAenKib4A7pOCgeGXOw">
+      <button class="btn btn-outline" data-i18n="btn.cancel" onclick="hideConfirm()" data-page-node-id="39uGvysGvF3QiKZvReC8Kh">取消</button>
+      <button class="btn btn-danger" id="confirmOkBtn" data-page-node-id="AkgDj5Co6vDD4wUeHMWAzq">确认</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   一、状态管理与常量
+   ============================================================ */
+
+/** localStorage 键名 */
+var LS_LEDGER = 'novolink_fee_ledger_v1';      // 账本数据
+var LS_CUSTOM_CUR = 'novolink_custom_currencies_v1'; // 自定义货币
+var LS_LAST_SETTLE = 'novolink_settle_currency_v1';  // 上次选择的结算货币
+var LS_REMARKS = 'novolink_remark_presets_v1';        // 备注常用选项
+var LS_RULES = 'novolink_rule_presets_v1';            // 结算规则预设（v7）
+var LS_LANG = 'fcLang';                                // 界面语言（v11 i18n）
+
+/* ============================================================
+   一·五、多语言支持（v11 i18n：zh / en / ms / vi）
+   ============================================================ */
+
+/** 多语言词典：key 为语义化英文，值为各语言文案；带 {0}{1}… 占位符的用 tf() 填充 */
+var I18N = {
+  zh: {
+    'app.title': '费率结算自动计算器',
+    'app.name': '费率结算自动计算器',
+    'app.sub': '代收订单上下游结算 & 记账（数据保存在本地浏览器）',
+    'app.footer': '费率结算自动计算器 · 单文件本地版 v11 · 数据存储于浏览器 localStorage，不会上传任何服务器',
+    'btn.customCur': '＋ 自定义货币', 'btn.cloudBackup': '☁ 云备份', 'btn.exportRules': '导出规则',
+    'btn.exportLedger': '导出账目', 'btn.import': '导入', 'btn.exportCsv': '导出 CSV', 'btn.clearLedger': '清空账本',
+    'btn.saveRule': '💾 存为规则', 'btn.applyRule': '套用规则 ▾', 'btn.addNextRule': '＋ 添加下一规则',
+    'btn.genUpTicket': '📋 生成上游工单', 'btn.genDownTicket': '📋 生成下游工单',
+    'btn.remarkPresets': '常用 ▾', 'btn.post': '✓ 一键入账', 'btn.reset': '重置',
+    'btn.upTicket': '📋 上游工单', 'btn.downTicket': '📋 下游工单', 'btn.combinedTicket': '📋 汇总工单',
+    'btn.clearDraft': '清空草稿', 'btn.clearFilters': '清除筛选', 'btn.cancel': '取消', 'btn.add': '添加',
+    'btn.close': '关闭', 'btn.copyTicket': '复制工单', 'btn.copied': '已复制 ✓',
+    'btn.testConn': '测试连接', 'btn.backupNow': '立即备份', 'btn.restore': '从云端恢复', 'btn.saveSettings': '保存设置',
+    'calc.title': '代收订单计算器', 'calc.tag': '输入即算',
+    'ph.header': '我方抬头（选填，仅入账/汇总工单使用）', 'ph.batch': '批次号（如：0920-A）',
+    'ph.ruleName': '规则/业务名，如：欧洲A方案', 'ph.merchant': '下游商户（如：EC Markets）',
+    'ph.fee': '如 0.5（留空 = 0）', 'ph.adj': '如 +0.5 / -0.3，不加则留空',
+    'ph.remark': '备注（选填，如：5月第1批结算）',
+    'ph.rateManual': '输入上游给的汇率', 'ph.rateApprox': '如 {0}（参考值，以实际为准）',
+    'ph.filter': '按备注 / 抬头 / 商户 / 批次 / 规则 / 工单号筛选',
+    'ph.amountRow': '金额 {0}（原始货币）',
+    'ph.curCode': '如 THB', 'ph.curName': '如 泰铢',
+    'ph.ghOwner': '如 octocat', 'ph.ghRepo': '如 fee-data', 'ph.ghBranch': 'main（默认）',
+    'ph.ghPath': 'fee-calculator/data.json（默认）', 'ph.ghToken': 'github_pat_… / ghp_…',
+    'opt.usePrevRate': '套用前项汇率', 'opt.gasFee': '商户承担 Gas Fee（实付另扣 1.2U）',
+    'panel.global': '全局参数', 'panel.up': '上游结算（我们 ← 上游）', 'panel.down': '下游结算（我们 → 下游）',
+    'label.ratePair': '汇率（{0} → {1}）',
+    'label.amounts': '金额（原始货币）',
+    'label.feeUp': '上游手续费率（%）', 'label.feeDown': '我方收取下游的手续费率（%）',
+    'label.adjUp': '上游汇率单价调整（每 1 {0} ± {1}）', 'label.adjDown': '下游汇率单价调整（每 1 {0} ± {1}）',
+    'label.effUp': '上游费后汇率（每 1 {0} 实得 {1}）', 'label.effDown': '下游费后汇率（每 1 {0} 支付 {1}）',
+    'label.subRecv': '小计实收（我方收入）', 'label.subPay': '小计实付（付给下游）',
+    'label.profit': '毛利（实收 − 实付）', 'label.settleCur': '结算货币：',
+    'hint.amounts': '输入正数后自动增加下一行；输入 0 不新增',
+    'hint.clickCopy': '点击复制',
+    'hint.post': '无草稿时入账当前规则；有草稿时一键入账全部规则（按各规则的下游商户记账）',
+    'err.ratePositive': '汇率必须为正数', 'err.amounts': '请至少输入一笔有效金额',
+    'err.feeRange': '费率需在 0 – 100 之间',
+    'err.adj': '调整值须为数字；且 汇率+调整 后须为正数',
+    'title.copyEffRate': '点击复制费后汇率', 'title.copyRecv': '点击复制实收金额', 'title.copyPay': '点击复制实付金额',
+    'title.ledgerTicket': '查看该单全部信息工单', 'title.rmDel': '删除该常用项', 'title.ruleDel': '删除该规则',
+    'notice.invalid': '请修正上方标红的输入项后再进行计算与入账。',
+    'stat.count': '总笔数', 'stat.recv': '总实收', 'stat.pay': '总实付', 'stat.gross': '总毛利',
+    'draft.title': '工单草稿', 'draft.count': '{0} 条规则', 'draft.remove': '移除',
+    'draft.empty': '暂无草稿：为每个商户逐条添加业务规则（填「下游商户」+「规则名」+ 费率/金额），点「＋ 添加下一规则」暂存，再一键入账 / 生成工单；无草稿时按当前输入处理。',
+    'draft.metaEntries': '{0} 笔', 'draft.metaRate': '汇率 {0}', 'draft.gasMark': '含Gas',
+    'draft.subRecv': '小计实收', 'draft.subPay': '小计实付', 'draft.gross': '毛利',
+    'rule.current': '当前业务',
+    'ruleSummary': '上{0}%{1} / 下{2}%{3}',
+    'rm.empty': '暂无常用备注：先在输入框填写，再点下方按钮保存',
+    'rm.save': '＋ 将输入框内容存为常用', 'rm.needInput': '请先在左侧输入框填写备注内容',
+    'ruleMenu.empty': '暂无已存规则：填好费率后输入规则名，点「💾 存为规则」',
+    'msg.needRuleNameBtn': '请先填写规则名', 'msg.ruleSaved': '已保存 ✓',
+    'ledger.title': '记账本', 'ledger.empty': '暂无账目记录',
+    'ledger.typeColl': '代收', 'ledger.gasTag': '含Gas', 'ledger.ticketBtn': '工单', 'ledger.delBtn': '删除',
+    'ledger.countTag': '{0} 笔（共 {1} 笔）', 'ledger.totalRow': '总计（当前筛选 {0} 笔）',
+    'ledger.col.time': '入账时间', 'ledger.col.type': '类型', 'ledger.col.header': '抬头', 'ledger.col.merchant': '商户',
+    'ledger.col.batch': '批次', 'ledger.col.rule': '业务规则', 'ledger.col.amount': '金额', 'ledger.col.rate': '汇率',
+    'ledger.col.feeUp': '上游费率', 'ledger.col.feeDown': '我方费率', 'ledger.col.recv': '实收', 'ledger.col.pay': '实付',
+    'ledger.col.gross': '毛利', 'ledger.col.remark': '备注', 'ledger.col.actions': '操作',
+    'filter.to': '至',
+    'cur.title': '添加自定义货币', 'cur.code': '货币代码', 'cur.name': '货币名称',
+    'cur.noDecimal': '无小数货币（显示取整，如 JPY / KRW）',
+    'cur.errCode': '货币代码需为 2–4 位英文字母（如 THB）', 'cur.errName': '请填写货币名称',
+    'cur.errDup': '货币代码 {0} 已存在', 'cur.added': '添加成功',
+    'cur.addedMsg': '货币 {0}（{1}）已添加，可在下拉中选择。',
+    'cur.searchPh': '搜索货币代码 / 名称…', 'cur.custom': '（自定义）', 'cur.noMatch': '无匹配货币',
+    'ticketModal.hint': '版本 v11 · 工单内所有数字均已用单反引号包裹，粘贴到 Telegram 后可逐个点按复制。若未见此提示，说明正在使用旧版页面，请关闭后重新打开 index.html。',
+    'cf.title': '确认', 'btn.ok': '知道了', 'btn.confirm': '确认',
+    'msg.tip': '提示', 'msg.delTitle': '删除该笔账目？', 'msg.delMsg': '删除后不可恢复，请确认。',
+    'msg.ledgerEmpty': '账本当前为空，无需清空。', 'msg.clearTitle': '清空全部账目？',
+    'msg.clearMsg': '将删除全部 {0} 笔账目，此操作不可恢复，请谨慎确认。',
+    'msg.csvEmpty': '当前筛选条件下没有可导出的账目。',
+    'msg.rulesEmpty': '暂无可导出的规则：先保存规则后再导出。',
+    'msg.ledgerNoExport': '账本为空，无可导出的账目。',
+    'msg.importFail': '导入失败', 'msg.notJson': '文件不是有效的 JSON 文件。',
+    'msg.unknownFormat': '无法识别的文件格式：请导入本工具导出的「规则」或「账目」JSON 文件。',
+    'msg.importDone': '导入完成',
+    'msg.rulesImported': '规则导入：新增 {0} 条，覆盖更新 {1} 条（现有共 {2} 条）。',
+    'msg.ledgerImported': '账目导入：新增 {0} 笔（现有共 {1} 笔）。',
+    'msg.fixInputs': '请先修正标红的输入项。',
+    'msg.fixInputsDraft': '请先修正标红的输入项，再把当前规则加入草稿。',
+    'msg.fixInputsTicket': '请先修正标红的输入项后再生成工单。',
+    'msg.needRuleName': '缺少规则名',
+    'msg.needRuleNameMsg': '请先在「规则/业务名」输入框填写名称（如：欧洲A方案），再添加下一规则。',
+    'msg.clearDraftTitle': '清空工单草稿？',
+    'msg.clearDraftMsg': '将移除全部 {0} 条规则草稿（不影响账本与已保存规则）。',
+    'msg.validateFail': '校验未通过',
+    'msg.validateFailMsg': '第 {0} 条规则「{1}」的汇率/费率/金额不合法，已阻止入账。',
+    'msg.postedTitle': '入账成功',
+    'msg.postedMsg': '已入账 {0} 条规则 · {1} 笔 · 实收 {2} · 实付 {3}。工单关联号 {4}（账目「工单」按钮可查看整单信息）。',
+    'gh.title': '☁ GitHub 云备份',
+    'gh.desc': '把 账目 / 规则 / 自定义货币 / 常用备注 备份到你自己的 GitHub 仓库（JSON 文件），换电脑、换浏览器时可恢复合并。Token 只保存在本机浏览器，不会发给任何第三方。',
+    'gh.owner': 'GitHub 用户名（Owner）', 'gh.repo': '仓库名（建议私有仓库）', 'gh.branch': '分支',
+    'gh.path': '备份文件路径',
+    'gh.token': 'Personal Access Token（勾选该仓库 Contents: Read and write 权限）',
+    'gh.err401': 'Token 无效或已过期（401）',
+    'gh.err403': '无权限（403）：请检查 Token 是否勾选了该仓库的 Contents 读写权限',
+    'gh.err404': '仓库 / 分支 / 文件路径不存在（404）',
+    'gh.err409': '云端文件已变更（409）：请重试',
+    'gh.errHttp': '请求失败（HTTP {0}）：{1}',
+    'gh.needOwnerRepo': '请至少填写用户名和仓库名。', 'gh.saved': '设置已保存到本机浏览器。',
+    'gh.needToken': '请填写 Token。', 'gh.connecting': '连接中…',
+    'gh.connOk': '✓ 连接成功：{0}（私有仓库）', 'gh.connOkPub': '✓ 连接成功：{0}（公开仓库）',
+    'gh.netErr': '网络错误：{0}',
+    'gh.needAll': '请先完整填写 用户名 / 仓库名 / Token。', 'gh.backingUp': '备份中…',
+    'gh.commitMsg': '费率计算器备份 {0}',
+    'gh.backupOk': '✓ 备份成功（{0}，commit {1}）', 'gh.reading': '读取云端数据…',
+    'gh.noFile': '云端暂无备份文件：请先「立即备份」。',
+    'gh.parseErr': '云端文件内容无法解析。', 'gh.notBackup': '云端文件不是本工具的备份文件。',
+    'gh.restoreTitle': '从云端恢复？',
+    'gh.restoreMsg': '云端备份时间：{0}（账目 {1} 笔 / 规则 {2} 条）。\n将与本地合并：账目按编号去重追加、规则同名覆盖，不会删除本地现有数据。',
+    'gh.unknownTime': '未知时间',
+    'gh.restoreOk': '✓ 恢复完成：账目新增 {0} 笔，规则新增 {1} / 更新 {2} 条。',
+    'ticket.t.up': '上游结算工单', 'ticket.t.down': '下游结算工单', 'ticket.t.all': '结算汇总工单（内部）',
+    'ticket.t.ledger': '结算工单 · 全单信息', 'ticket.t.allModal': '结算汇总工单',
+    'ticket.time': '时间：', 'ticket.pair': '货币对：', 'ticket.header': '我方抬头：', 'ticket.batch': '批次：',
+    'ticket.remark': '备注：',
+    'ticket.gas': '（商户承担 Gas Fee）', 'ticket.inclGas': '（含Gas）',
+    'ticket.rateLine': '汇率 {0}（{1} → {2}）',
+    'ticket.upLine': '上游 费率 {0} · 单价 {1} · 费后 {2}（{3}）',
+    'ticket.downLine': '下游 费率 {0} · 单价 {1} · 费后 {2}（{3}）',
+    'ticket.lineRecv': '  #{0} {1} → 实收 {2}', 'ticket.linePay': '  #{0} {1} → 实付 {2}',
+    'ticket.lineBoth': '  #{0} {1} → 实收 {2} / 实付 {3}',
+    'ticket.subRecv': '  小计实收 {0}（{1} 笔）', 'ticket.subPay': '  小计实付 {0}（{1} 笔）',
+    'ticket.subAll': '  小计 实收 {0} · 实付 {1} · 毛利 {2}（{3} 笔）',
+    'ticket.totalRecv': '✅ 总计实收（我方收入）{0}（{1} 项业务 · {2} 笔）',
+    'ticket.totalPay': '✅ 总计实付（付给下游）{0}（{1} 项业务 · {2} 笔 · {3} 个商户）',
+    'ticket.totalAll': '💰 总计 实收 {0} · 实付 {1} · 毛利 {2}（{3} 项业务 · {4} 笔 · {5} 个商户）',
+    'ticket.totalAllNoM': '💰 总计 实收 {0} · 实付 {1} · 毛利 {2}（{3} 项业务 · {4} 笔）',
+    'ticket.merchant': '商户：', 'ticket.noMerchant': '（未填商户）', 'ticket.merchantParen': '（商户：{0}）',
+    'ticket.mSubHead': '— 商户小计 —',
+    'ticket.mSubAll': '实收 {0} · 实付 {1} · 毛利 {2}（{3} 项业务 · {4} 笔）',
+    'ticket.mSubPay': '实付 {0}（{1} 项业务 · {2} 笔）',
+    'ticket.noName': '未命名规则',
+    'formula.rateWord': '汇率', 'formula.adjRate': '(汇率 {0})',
+    'formula.recv': '实收 = Σ(金额 × {0} × (1 − 上游费率))',
+    'formula.pay': '实付 = Σ(金额 × {0} × (1 − 我方费率)){1}',
+    'formula.gasSuffix': ' − 1.2×笔数（Gas 由商户承担）',
+    'pf.pos': '正数为盈利', 'pf.neg': '当前为负毛利（亏损）',
+    'csv.header': '入账时间,订单类型,抬头,下游商户,批次,业务规则,金额货币,金额,结算货币,汇率,上游费率%,上游单价调整,我方费率%,下游单价调整,商户承担Gas,实收,实付,毛利,工单号,备注',
+    'csv.gasYes': '是(1.2U)', 'csv.gasNo': '否',
+    'fn.csv': '费率账本', 'fn.rules': '结算规则', 'fn.ledgerJson': '费率账目'
+  }
+};
+
+/** English */
+I18N.en = {
+  'app.title': 'Fee Settlement Calculator',
+  'app.name': 'Fee Settlement Calculator',
+  'app.sub': 'Upstream/downstream settlement & bookkeeping for collection orders (data stored locally in your browser)',
+  'app.footer': 'Fee Settlement Calculator · Single-file local version v11 · Data is stored in browser localStorage and never uploaded to any server',
+  'btn.customCur': '＋ Custom Currency', 'btn.cloudBackup': '☁ Cloud Backup', 'btn.exportRules': 'Export Rules',
+  'btn.exportLedger': 'Export Ledger', 'btn.import': 'Import', 'btn.exportCsv': 'Export CSV', 'btn.clearLedger': 'Clear Ledger',
+  'btn.saveRule': '💾 Save Rule', 'btn.applyRule': 'Apply Rule ▾', 'btn.addNextRule': '＋ Add Next Rule',
+  'btn.genUpTicket': '📋 Generate Upstream Ticket', 'btn.genDownTicket': '📋 Generate Downstream Ticket',
+  'btn.remarkPresets': 'Presets ▾', 'btn.post': '✓ Post to Ledger', 'btn.reset': 'Reset',
+  'btn.upTicket': '📋 Upstream Ticket', 'btn.downTicket': '📋 Downstream Ticket', 'btn.combinedTicket': '📋 Summary Ticket',
+  'btn.clearDraft': 'Clear Drafts', 'btn.clearFilters': 'Clear Filters', 'btn.cancel': 'Cancel', 'btn.add': 'Add',
+  'btn.close': 'Close', 'btn.copyTicket': 'Copy Ticket', 'btn.copied': 'Copied ✓',
+  'btn.testConn': 'Test Connection', 'btn.backupNow': 'Backup Now', 'btn.restore': 'Restore from Cloud', 'btn.saveSettings': 'Save Settings',
+  'calc.title': 'Collection Order Calculator', 'calc.tag': 'Live Calculation',
+  'ph.header': 'Our company title (optional, used only in ledger/summary tickets)', 'ph.batch': 'Batch No. (e.g. 0920-A)',
+  'ph.ruleName': 'Rule/business name, e.g. Plan A Europe', 'ph.merchant': 'Downstream merchant (e.g. EC Markets)',
+  'ph.fee': 'e.g. 0.5 (blank = 0)', 'ph.adj': 'e.g. +0.5 / -0.3, leave blank if none',
+  'ph.remark': 'Remark (optional, e.g. May batch 1 settlement)',
+  'ph.rateManual': 'Enter the rate from upstream', 'ph.rateApprox': 'e.g. {0} (reference, actual prevails)',
+  'ph.filter': 'Filter by remark / title / merchant / batch / rule / ticket No.',
+  'ph.amountRow': 'Amount {0} (source currency)',
+  'ph.curCode': 'e.g. THB', 'ph.curName': 'e.g. Thai Baht',
+  'ph.ghOwner': 'e.g. octocat', 'ph.ghRepo': 'e.g. fee-data', 'ph.ghBranch': 'main (default)',
+  'ph.ghPath': 'fee-calculator/data.json (default)', 'ph.ghToken': 'github_pat_… / ghp_…',
+  'opt.usePrevRate': 'Use previous rate', 'opt.gasFee': 'Merchant bears Gas Fee (extra 1.2U deducted from payment)',
+  'panel.global': 'Global Parameters', 'panel.up': 'Upstream Settlement (We ← Upstream)', 'panel.down': 'Downstream Settlement (We → Downstream)',
+  'label.ratePair': 'Rate ({0} → {1})',
+  'label.amounts': 'Amounts (source currency)',
+  'label.feeUp': 'Upstream fee rate (%)', 'label.feeDown': 'Our fee rate charged to downstream (%)',
+  'label.adjUp': 'Upstream rate unit adjustment (± {1} per 1 {0})', 'label.adjDown': 'Downstream rate unit adjustment (± {1} per 1 {0})',
+  'label.effUp': 'Upstream effective rate ({1} received per 1 {0})', 'label.effDown': 'Downstream effective rate ({1} paid per 1 {0})',
+  'label.subRecv': 'Subtotal Received (our income)', 'label.subPay': 'Subtotal Paid (paid to downstream)',
+  'label.profit': 'Gross Profit (Received − Paid)', 'label.settleCur': 'Settlement currency: ',
+  'hint.amounts': 'A new row is added automatically after entering a positive number; entering 0 adds none',
+  'hint.clickCopy': 'Click to copy',
+  'hint.post': 'Without drafts, the current rule is posted; with drafts, all rules are posted at once (booked per downstream merchant)',
+  'err.ratePositive': 'Rate must be a positive number', 'err.amounts': 'Enter at least one valid amount',
+  'err.feeRange': 'Fee rate must be between 0 and 100',
+  'err.adj': 'Adjustment must be a number; rate + adjustment must be positive',
+  'title.copyEffRate': 'Click to copy effective rate', 'title.copyRecv': 'Click to copy received amount', 'title.copyPay': 'Click to copy paid amount',
+  'title.ledgerTicket': 'View full ticket of this entry', 'title.rmDel': 'Delete this preset', 'title.ruleDel': 'Delete this rule',
+  'notice.invalid': 'Please fix the highlighted inputs above before calculating and posting.',
+  'stat.count': 'Total Entries', 'stat.recv': 'Total Received', 'stat.pay': 'Total Paid', 'stat.gross': 'Total Gross Profit',
+  'draft.title': 'Ticket Drafts', 'draft.count': '{0} rules', 'draft.remove': 'Remove',
+  'draft.empty': 'No drafts yet: add a business rule for each merchant (fill "Downstream merchant" + "Rule name" + fees/amounts), click "＋ Add Next Rule" to stage it, then post or generate tickets at once; without drafts the current input is used.',
+  'draft.metaEntries': '{0} entries', 'draft.metaRate': 'Rate {0}', 'draft.gasMark': 'incl. Gas',
+  'draft.subRecv': 'Subtotal received', 'draft.subPay': 'Subtotal paid', 'draft.gross': 'Gross',
+  'rule.current': 'Current business',
+  'ruleSummary': 'Up {0}%{1} / Down {2}%{3}',
+  'rm.empty': 'No remark presets yet: type in the box first, then save with the button below',
+  'rm.save': '＋ Save input as preset', 'rm.needInput': 'Type a remark in the input box first',
+  'ruleMenu.empty': 'No saved rules yet: set the fees, enter a rule name, then click "💾 Save Rule"',
+  'msg.needRuleNameBtn': 'Enter a rule name first', 'msg.ruleSaved': 'Saved ✓',
+  'ledger.title': 'Ledger', 'ledger.empty': 'No ledger entries yet',
+  'ledger.typeColl': 'Collection', 'ledger.gasTag': 'incl. Gas', 'ledger.ticketBtn': 'Ticket', 'ledger.delBtn': 'Delete',
+  'ledger.countTag': '{0} entries (of {1})', 'ledger.totalRow': 'Total ({0} filtered entries)',
+  'ledger.col.time': 'Time', 'ledger.col.type': 'Type', 'ledger.col.header': 'Title', 'ledger.col.merchant': 'Merchant',
+  'ledger.col.batch': 'Batch', 'ledger.col.rule': 'Rule', 'ledger.col.amount': 'Amount', 'ledger.col.rate': 'Rate',
+  'ledger.col.feeUp': 'Upstream Fee', 'ledger.col.feeDown': 'Our Fee', 'ledger.col.recv': 'Received', 'ledger.col.pay': 'Paid',
+  'ledger.col.gross': 'Gross', 'ledger.col.remark': 'Remark', 'ledger.col.actions': 'Actions',
+  'filter.to': 'to',
+  'cur.title': 'Add Custom Currency', 'cur.code': 'Currency Code', 'cur.name': 'Currency Name',
+  'cur.noDecimal': 'No-decimal currency (rounded display, e.g. JPY / KRW)',
+  'cur.errCode': 'Currency code must be 2–4 English letters (e.g. THB)', 'cur.errName': 'Please enter the currency name',
+  'cur.errDup': 'Currency code {0} already exists', 'cur.added': 'Added',
+  'cur.addedMsg': 'Currency {0} ({1}) has been added and is available in the dropdown.',
+  'cur.searchPh': 'Search code / name…', 'cur.custom': ' (custom)', 'cur.noMatch': 'No matching currency',
+  'ticketModal.hint': 'Version v11 · All numbers in the ticket are wrapped in single backticks so each can be tapped to copy after pasting into Telegram. If you do not see this notice, you are viewing an outdated page; please close and reopen index.html.',
+  'cf.title': 'Confirm', 'btn.ok': 'Got it', 'btn.confirm': 'Confirm',
+  'msg.tip': 'Notice', 'msg.delTitle': 'Delete this entry?', 'msg.delMsg': 'This cannot be undone. Please confirm.',
+  'msg.ledgerEmpty': 'The ledger is already empty.', 'msg.clearTitle': 'Clear all entries?',
+  'msg.clearMsg': 'All {0} entries will be deleted. This cannot be undone. Please confirm carefully.',
+  'msg.csvEmpty': 'No entries to export under the current filters.',
+  'msg.rulesEmpty': 'No rules to export: save rules first.',
+  'msg.ledgerNoExport': 'The ledger is empty; nothing to export.',
+  'msg.importFail': 'Import Failed', 'msg.notJson': 'The file is not valid JSON.',
+  'msg.unknownFormat': 'Unrecognized file format: please import a "rules" or "ledger" JSON file exported by this tool.',
+  'msg.importDone': 'Import Complete',
+  'msg.rulesImported': 'Rules imported: {0} added, {1} overwritten (now {2} in total).',
+  'msg.ledgerImported': 'Entries imported: {0} added (now {1} in total).',
+  'msg.fixInputs': 'Please fix the highlighted inputs first.',
+  'msg.fixInputsDraft': 'Please fix the highlighted inputs before adding the rule to drafts.',
+  'msg.fixInputsTicket': 'Please fix the highlighted inputs before generating the ticket.',
+  'msg.needRuleName': 'Rule name required',
+  'msg.needRuleNameMsg': 'Please enter a name in the "Rule/business name" field (e.g. Plan A Europe) before adding the next rule.',
+  'msg.clearDraftTitle': 'Clear ticket drafts?',
+  'msg.clearDraftMsg': 'All {0} rule drafts will be removed (the ledger and saved rules are unaffected).',
+  'msg.validateFail': 'Validation failed',
+  'msg.validateFailMsg': 'Rule #{0} "{1}" has an invalid rate/fee/amount; posting was blocked.',
+  'msg.postedTitle': 'Posted',
+  'msg.postedMsg': 'Posted {0} rules · {1} entries · received {2} · paid {3}. Ticket ref {4} (use the "Ticket" button in the ledger to view the full order).',
+  'gh.title': '☁ GitHub Cloud Backup',
+  'gh.desc': 'Back up ledger / rules / custom currencies / remark presets to your own GitHub repository (JSON file); restore and merge when you switch computers or browsers. The token is stored only in your local browser and never sent to any third party.',
+  'gh.owner': 'GitHub Username (Owner)', 'gh.repo': 'Repository name (private repo recommended)', 'gh.branch': 'Branch',
+  'gh.path': 'Backup file path',
+  'gh.token': 'Personal Access Token (grant Contents: Read and write on the repo)',
+  'gh.err401': 'Token is invalid or expired (401)',
+  'gh.err403': 'Forbidden (403): check that the token grants Contents read/write on the repo',
+  'gh.err404': 'Repository / branch / file path not found (404)',
+  'gh.err409': 'Cloud file has changed (409): please retry',
+  'gh.errHttp': 'Request failed (HTTP {0}): {1}',
+  'gh.needOwnerRepo': 'Please fill in at least the username and repository name.', 'gh.saved': 'Settings saved to this browser.',
+  'gh.needToken': 'Please enter the token.', 'gh.connecting': 'Connecting…',
+  'gh.connOk': '✓ Connected: {0} (private repository)', 'gh.connOkPub': '✓ Connected: {0} (public repository)',
+  'gh.netErr': 'Network error: {0}',
+  'gh.needAll': 'Please complete username / repository / token first.', 'gh.backingUp': 'Backing up…',
+  'gh.commitMsg': 'Fee calculator backup {0}',
+  'gh.backupOk': '✓ Backup succeeded ({0}, commit {1})', 'gh.reading': 'Reading cloud data…',
+  'gh.noFile': 'No backup file in the cloud yet: use "Backup Now" first.',
+  'gh.parseErr': 'Cloud file content could not be parsed.', 'gh.notBackup': 'The cloud file is not a backup of this tool.',
+  'gh.restoreTitle': 'Restore from cloud?',
+  'gh.restoreMsg': 'Cloud backup time: {0} ({1} entries / {2} rules).\nIt will be merged with local data: entries are appended with id de-duplication, rules with the same name are overwritten; existing local data is never deleted.',
+  'gh.unknownTime': 'unknown time',
+  'gh.restoreOk': '✓ Restore complete: {0} entries added, rules {1} added / {2} updated.',
+  'ticket.t.up': 'Upstream Settlement Ticket', 'ticket.t.down': 'Downstream Settlement Ticket', 'ticket.t.all': 'Settlement Summary Ticket (internal)',
+  'ticket.t.ledger': 'Settlement Ticket · Full Details', 'ticket.t.allModal': 'Settlement Summary Ticket',
+  'ticket.time': 'Time: ', 'ticket.pair': 'Currency pair: ', 'ticket.header': 'Our title: ', 'ticket.batch': 'Batch: ',
+  'ticket.remark': 'Remark: ',
+  'ticket.gas': ' (merchant bears Gas Fee)', 'ticket.inclGas': ' (incl. Gas)',
+  'ticket.rateLine': 'Rate {0} ({1} → {2})',
+  'ticket.upLine': 'Upstream fee {0} · unit adj {1} · effective {2} ({3})',
+  'ticket.downLine': 'Downstream fee {0} · unit adj {1} · effective {2} ({3})',
+  'ticket.lineRecv': '  #{0} {1} → Received {2}', 'ticket.linePay': '  #{0} {1} → Paid {2}',
+  'ticket.lineBoth': '  #{0} {1} → Received {2} / Paid {3}',
+  'ticket.subRecv': '  Subtotal received {0} ({1} entries)', 'ticket.subPay': '  Subtotal paid {0} ({1} entries)',
+  'ticket.subAll': '  Subtotal received {0} · paid {1} · gross {2} ({3} entries)',
+  'ticket.totalRecv': '✅ Total received (our income) {0} ({1} rules · {2} entries)',
+  'ticket.totalPay': '✅ Total paid (to downstream) {0} ({1} rules · {2} entries · {3} merchants)',
+  'ticket.totalAll': '💰 Total received {0} · paid {1} · gross {2} ({3} rules · {4} entries · {5} merchants)',
+  'ticket.totalAllNoM': '💰 Total received {0} · paid {1} · gross {2} ({3} rules · {4} entries)',
+  'ticket.merchant': 'Merchant: ', 'ticket.noMerchant': '(no merchant)', 'ticket.merchantParen': ' (merchant: {0})',
+  'ticket.mSubHead': '— Merchant subtotal —',
+  'ticket.mSubAll': 'Received {0} · paid {1} · gross {2} ({3} rules · {4} entries)',
+  'ticket.mSubPay': 'Paid {0} ({1} rules · {2} entries)',
+  'ticket.noName': 'Unnamed rule',
+  'formula.rateWord': 'Rate', 'formula.adjRate': '(Rate {0})',
+  'formula.recv': 'Received = Σ(Amount × {0} × (1 − Upstream fee))',
+  'formula.pay': 'Paid = Σ(Amount × {0} × (1 − Our fee)){1}',
+  'formula.gasSuffix': ' − 1.2 × entries (Gas borne by merchant)',
+  'pf.pos': 'Positive means profit', 'pf.neg': 'Negative gross (loss)',
+  'csv.header': 'Time,Type,Title,Downstream Merchant,Batch,Rule,Amount Currency,Amount,Settlement Currency,Rate,Upstream Fee %,Upstream Unit Adj,Our Fee %,Downstream Unit Adj,Merchant Bears Gas,Received,Paid,Gross,Ticket No.,Remark',
+  'csv.gasYes': 'Yes (1.2U)', 'csv.gasNo': 'No',
+  'fn.csv': 'fee-ledger', 'fn.rules': 'settlement-rules', 'fn.ledgerJson': 'fee-ledger-data'
+};
+
+/** Bahasa Melayu */
+I18N.ms = {
+  'app.title': 'Kalkulator Penyelesaian Fi',
+  'app.name': 'Kalkulator Penyelesaian Fi',
+  'app.sub': 'Penyelesaian hulu & hilir serta catatan akaun untuk pesanan kutipan (data disimpan dalam pelayar tempatan)',
+  'app.footer': 'Kalkulator Penyelesaian Fi · Versi tempatan satu fail v11 · Data disimpan dalam localStorage pelayar dan tidak dimuat naik ke mana-mana pelayan',
+  'btn.customCur': '＋ Mata Wang Tersuai', 'btn.cloudBackup': '☁ Sandaran Awan', 'btn.exportRules': 'Eksport Peraturan',
+  'btn.exportLedger': 'Eksport Akaun', 'btn.import': 'Import', 'btn.exportCsv': 'Eksport CSV', 'btn.clearLedger': 'Kosongkan Akaun',
+  'btn.saveRule': '💾 Simpan Peraturan', 'btn.applyRule': 'Guna Peraturan ▾', 'btn.addNextRule': '＋ Tambah Peraturan Seterusnya',
+  'btn.genUpTicket': '📋 Jana Resit Huliran', 'btn.genDownTicket': '📋 Jana Resit Hiliran',
+  'btn.remarkPresets': 'Lazim ▾', 'btn.post': '✓ Rekod Sekali Klik', 'btn.reset': 'Set Semula',
+  'btn.upTicket': '📋 Resit Huliran', 'btn.downTicket': '📋 Resit Hiliran', 'btn.combinedTicket': '📋 Resit Ringkasan',
+  'btn.clearDraft': 'Kosongkan Draf', 'btn.clearFilters': 'Kosongkan Tapisan', 'btn.cancel': 'Batal', 'btn.add': 'Tambah',
+  'btn.close': 'Tutup', 'btn.copyTicket': 'Salin Resit', 'btn.copied': 'Disalin ✓',
+  'btn.testConn': 'Uji Sambungan', 'btn.backupNow': 'Sandar Sekarang', 'btn.restore': 'Pulih dari Awan', 'btn.saveSettings': 'Simpan Tetapan',
+  'calc.title': 'Kalkulator Pesanan Kutipan', 'calc.tag': 'Kiraan Segera',
+  'ph.header': 'Tajuk syarikat kami (pilihan, hanya untuk resit akaun/ringkasan)', 'ph.batch': 'No. kumpulan (cth. 0920-A)',
+  'ph.ruleName': 'Nama peraturan/perniagaan, cth. Pelan A Eropah', 'ph.merchant': 'Pedagang hiliran (cth. EC Markets)',
+  'ph.fee': 'cth. 0.5 (kosong = 0)', 'ph.adj': 'cth. +0.5 / -0.3, kosongkan jika tiada',
+  'ph.remark': 'Catatan (pilihan, cth. penyelesaian kumpulan 1 Mei)',
+  'ph.rateManual': 'Masukkan kadar daripada huliran', 'ph.rateApprox': 'cth. {0} (rujukan, ikut kadar sebenar)',
+  'ph.filter': 'Tapis mengikut catatan / tajuk / pedagang / kumpulan / peraturan / no. resit',
+  'ph.amountRow': 'Jumlah {0} (mata wang asal)',
+  'ph.curCode': 'cth. THB', 'ph.curName': 'cth. Baht Thai',
+  'ph.ghOwner': 'cth. octocat', 'ph.ghRepo': 'cth. fee-data', 'ph.ghBranch': 'main (lalai)',
+  'ph.ghPath': 'fee-calculator/data.json (lalai)', 'ph.ghToken': 'github_pat_… / ghp_…',
+  'opt.usePrevRate': 'Guna kadar sebelumnya', 'opt.gasFee': 'Pedagang menanggung Gas Fee (1.2U ditolak daripada bayaran)',
+  'panel.global': 'Parameter Global', 'panel.up': 'Penyelesaian Huliran (Kami ← Huliran)', 'panel.down': 'Penyelesaian Hiliran (Kami → Hiliran)',
+  'label.ratePair': 'Kadar ({0} → {1})',
+  'label.amounts': 'Jumlah (mata wang asal)',
+  'label.feeUp': 'Kadar fi huliran (%)', 'label.feeDown': 'Kadar fi kami dikenakan kepada hiliran (%)',
+  'label.adjUp': 'Pelarasan seunit kadar huliran (± {1} setiap 1 {0})', 'label.adjDown': 'Pelarasan seunit kadar hiliran (± {1} setiap 1 {0})',
+  'label.effUp': 'Kadar berkesan huliran ({1} diterima setiap 1 {0})', 'label.effDown': 'Kadar berkesan hiliran ({1} dibayar setiap 1 {0})',
+  'label.subRecv': 'Jumlah diterima (pendapatan kami)', 'label.subPay': 'Jumlah dibayar (kepada hiliran)',
+  'label.profit': 'Untung kasar (Diterima − Dibayar)', 'label.settleCur': 'Mata wang penyelesaian: ',
+  'hint.amounts': 'Baris baharu ditambah secara automatik selepas memasukkan nombor positif; 0 tidak menambah',
+  'hint.clickCopy': 'Klik untuk salin',
+  'hint.post': 'Tanpa draf, peraturan semasa direkodkan; dengan draf, semua peraturan direkodkan sekali gus (mengikut pedagang hiliran setiap peraturan)',
+  'err.ratePositive': 'Kadar mestilah nombor positif', 'err.amounts': 'Masukkan sekurang-kurangnya satu jumlah sah',
+  'err.feeRange': 'Kadar fi mestilah antara 0 hingga 100',
+  'err.adj': 'Pelarasan mestilah nombor; kadar + pelarasan mestilah positif',
+  'title.copyEffRate': 'Klik untuk menyalin kadar berkesan', 'title.copyRecv': 'Klik untuk salin jumlah diterima', 'title.copyPay': 'Klik untuk salin jumlah dibayar',
+  'title.ledgerTicket': 'Lihat resit penuh untuk catatan ini', 'title.rmDel': 'Padam item ini', 'title.ruleDel': 'Padam peraturan ini',
+  'notice.invalid': 'Sila betulkan input bertanda merah di atas sebelum mengira dan merekod.',
+  'stat.count': 'Jumlah Catatan', 'stat.recv': 'Jumlah Diterima', 'stat.pay': 'Jumlah Dibayar', 'stat.gross': 'Jumlah Untung Kasar',
+  'draft.title': 'Draf Resit', 'draft.count': '{0} peraturan', 'draft.remove': 'Buang',
+  'draft.empty': 'Tiada draf lagi: tambah peraturan perniagaan untuk setiap pedagang (isi "Pedagang hiliran" + "Nama peraturan" + fi/jumlah), klik "＋ Tambah Peraturan Seterusnya" untuk simpan sementara, kemudian rekod / jana resit sekali gus; tanpa draf, input semasa digunakan.',
+  'draft.metaEntries': '{0} catatan', 'draft.metaRate': 'Kadar {0}', 'draft.gasMark': 'termasuk Gas',
+  'draft.subRecv': 'Jumlah diterima', 'draft.subPay': 'Jumlah dibayar', 'draft.gross': 'Untung kasar',
+  'rule.current': 'Perniagaan semasa',
+  'ruleSummary': 'Atas {0}%{1} / Bawah {2}%{3}',
+  'rm.empty': 'Tiada catatan lazim lagi: isi dalam kotak dahulu, kemudian simpan dengan butang di bawah',
+  'rm.save': '＋ Simpan input sebagai lazim', 'rm.needInput': 'Isi catatan dalam kotak input dahulu',
+  'ruleMenu.empty': 'Tiada peraturan tersimpan lagi: isi fi, masukkan nama peraturan, kemudian klik "💾 Simpan Peraturan"',
+  'msg.needRuleNameBtn': 'Isi nama peraturan dahulu', 'msg.ruleSaved': 'Disimpan ✓',
+  'ledger.title': 'Buku Akaun', 'ledger.empty': 'Tiada catatan akaun lagi',
+  'ledger.typeColl': 'Kutipan', 'ledger.gasTag': 'termasuk Gas', 'ledger.ticketBtn': 'Resit', 'ledger.delBtn': 'Padam',
+  'ledger.countTag': '{0} catatan (daripada {1})', 'ledger.totalRow': 'Jumlah ({0} catatan ditapis)',
+  'ledger.col.time': 'Masa', 'ledger.col.type': 'Jenis', 'ledger.col.header': 'Tajuk', 'ledger.col.merchant': 'Pedagang',
+  'ledger.col.batch': 'Kumpulan', 'ledger.col.rule': 'Peraturan', 'ledger.col.amount': 'Jumlah', 'ledger.col.rate': 'Kadar',
+  'ledger.col.feeUp': 'Fi Huliran', 'ledger.col.feeDown': 'Fi Kami', 'ledger.col.recv': 'Diterima', 'ledger.col.pay': 'Dibayar',
+  'ledger.col.gross': 'Untung Kasar', 'ledger.col.remark': 'Catatan', 'ledger.col.actions': 'Tindakan',
+  'filter.to': 'hingga',
+  'cur.title': 'Tambah Mata Wang Tersuai', 'cur.code': 'Kod Mata Wang', 'cur.name': 'Nama Mata Wang',
+  'cur.noDecimal': 'Mata wang tanpa perpuluhan (dibundarkan, cth. JPY / KRW)',
+  'cur.errCode': 'Kod mata wang mestilah 2–4 huruf Inggeris (cth. THB)', 'cur.errName': 'Sila masukkan nama mata wang',
+  'cur.errDup': 'Kod mata wang {0} sudah wujud', 'cur.added': 'Berjaya ditambah',
+  'cur.addedMsg': 'Mata wang {0} ({1}) telah ditambah dan boleh dipilih dalam senarai jatuh.',
+  'cur.searchPh': 'Cari kod / nama…', 'cur.custom': ' (tersuai)', 'cur.noMatch': 'Tiada mata wang sepadan',
+  'ticketModal.hint': 'Versi v11 · Semua nombor dalam resit dibalut dengan backtick tunggal supaya boleh disalin satu demi satu selepas ditampal ke Telegram. Jika notis ini tidak dipaparkan, anda menggunakan halaman lama; sila tutup dan buka semula index.html.',
+  'cf.title': 'Sahkan', 'btn.ok': 'Faham', 'btn.confirm': 'Sahkan',
+  'msg.tip': 'Notis', 'msg.delTitle': 'Padam catatan ini?', 'msg.delMsg': 'Tindakan ini tidak boleh diundur. Sila sahkan.',
+  'msg.ledgerEmpty': 'Buku akaun sudah kosong.', 'msg.clearTitle': 'Kosongkan semua catatan?',
+  'msg.clearMsg': 'Semua {0} catatan akan dipadamkan dan tidak boleh diundur. Sila sahkan dengan berhati-hati.',
+  'msg.csvEmpty': 'Tiada catatan untuk dieksport di bawah tapisan semasa.',
+  'msg.rulesEmpty': 'Tiada peraturan untuk dieksport: simpan peraturan dahulu.',
+  'msg.ledgerNoExport': 'Buku akaun kosong; tiada untuk dieksport.',
+  'msg.importFail': 'Import Gagal', 'msg.notJson': 'Fail bukan JSON yang sah.',
+  'msg.unknownFormat': 'Format fail tidak dikenali: sila import fail JSON "peraturan" atau "akaun" yang dieksport oleh alat ini.',
+  'msg.importDone': 'Import Selesai',
+  'msg.rulesImported': 'Peraturan diimport: {0} ditambah, {1} dikemas kini (kini {2} jumlahnya).',
+  'msg.ledgerImported': 'Catatan diimport: {0} ditambah (kini {1} jumlahnya).',
+  'msg.fixInputs': 'Sila betulkan input bertanda merah dahulu.',
+  'msg.fixInputsDraft': 'Sila betulkan input bertanda merah sebelum menambah peraturan ke draf.',
+  'msg.fixInputsTicket': 'Sila betulkan input bertanda merah sebelum menjana resit.',
+  'msg.needRuleName': 'Nama peraturan diperlukan',
+  'msg.needRuleNameMsg': 'Sila masukkan nama dalam medan "Nama peraturan/perniagaan" (cth. Pelan A Eropah) sebelum menambah peraturan seterusnya.',
+  'msg.clearDraftTitle': 'Kosongkan draf resit?',
+  'msg.clearDraftMsg': 'Semua {0} draf peraturan akan dibuang (buku akaun dan peraturan tersimpan tidak terjejas).',
+  'msg.validateFail': 'Pengesahan gagal',
+  'msg.validateFailMsg': 'Peraturan #{0} "{1}" mempunyai kadar/fi/jumlah tidak sah; merekod telah dihalang.',
+  'msg.postedTitle': 'Berjaya Direkod',
+  'msg.postedMsg': '{0} peraturan direkodkan · {1} catatan · diterima {2} · dibayar {3}. No. rujukan resit {4} (butang "Resit" dalam buku akaun boleh melihat maklumat penuh pesanan).',
+  'gh.title': '☁ Sandaran Awan GitHub',
+  'gh.desc': 'Sandarkan akaun / peraturan / mata wang tersuai / catatan lazim ke repositori GitHub anda sendiri (fail JSON); pulihkan dan gabungkan apabila menukar komputer atau pelayar. Token hanya disimpan dalam pelayar tempatan anda dan tidak dihantar kepada mana-mana pihak ketiga.',
+  'gh.owner': 'Nama pengguna GitHub (Owner)', 'gh.repo': 'Nama repositori (cadangan persendirian)', 'gh.branch': 'Cawangan',
+  'gh.path': 'Laluan fail sandaran',
+  'gh.token': 'Personal Access Token (beri kebenaran Contents: Read and write untuk repositori)',
+  'gh.err401': 'Token tidak sah atau telah tamat tempoh (401)',
+  'gh.err403': 'Tiada kebenaran (403): semak sama ada Token diberi kebenaran baca/tulis Contents repositori',
+  'gh.err404': 'Repositori / cawangan / laluan fail tidak wujud (404)',
+  'gh.err409': 'Fail awan telah berubah (409): sila cuba semula',
+  'gh.errHttp': 'Permintaan gagal (HTTP {0}): {1}',
+  'gh.needOwnerRepo': 'Sila isi sekurang-kurangnya nama pengguna dan nama repositori.', 'gh.saved': 'Tetapan telah disimpan dalam pelayar ini.',
+  'gh.needToken': 'Sila masukkan Token.', 'gh.connecting': 'Menyambung…',
+  'gh.connOk': '✓ Berjaya disambung: {0} (repositori persendirian)', 'gh.connOkPub': '✓ Berjaya disambung: {0} (repositori awam)',
+  'gh.netErr': 'Ralat rangkaian: {0}',
+  'gh.needAll': 'Sila lengkapkan nama pengguna / nama repositori / Token dahulu.', 'gh.backingUp': 'Menyandarkan…',
+  'gh.commitMsg': 'Sandaran kalkulator fi {0}',
+  'gh.backupOk': '✓ Sandaran berjaya ({0}, commit {1})', 'gh.reading': 'Membaca data awan…',
+  'gh.noFile': 'Tiada fail sandaran di awan lagi: gunakan "Sandar Sekarang" dahulu.',
+  'gh.parseErr': 'Kandungan fail awan tidak dapat dihurai.', 'gh.notBackup': 'Fail awan bukan fail sandaran alat ini.',
+  'gh.restoreTitle': 'Pulih dari awan?',
+  'gh.restoreMsg': 'Masa sandaran awan: {0} ({1} catatan / {2} peraturan).\nIa akan digabungkan dengan data tempatan: catatan ditambah dengan nyah-duplikasi id, peraturan bernama sama ditimpa; data tempatan sedia ada tidak akan dipadam.',
+  'gh.unknownTime': 'masa tidak diketahui',
+  'gh.restoreOk': '✓ Pemulihan selesai: {0} catatan ditambah, peraturan {1} baharu / {2} dikemas kini.',
+  'ticket.t.up': 'Resit Penyelesaian Huliran', 'ticket.t.down': 'Resit Penyelesaian Hiliran', 'ticket.t.all': 'Resit Ringkasan Penyelesaian (dalaman)',
+  'ticket.t.ledger': 'Resit Penyelesaian · Maklumat Penuh', 'ticket.t.allModal': 'Resit Ringkasan Penyelesaian',
+  'ticket.time': 'Masa: ', 'ticket.pair': 'Pasangan mata wang: ', 'ticket.header': 'Tajuk kami: ', 'ticket.batch': 'Kumpulan: ',
+  'ticket.remark': 'Catatan: ',
+  'ticket.gas': ' (pedagang menanggung Gas Fee)', 'ticket.inclGas': ' (termasuk Gas)',
+  'ticket.rateLine': 'Kadar {0} ({1} → {2})',
+  'ticket.upLine': 'Fi huliran {0} · pelarasan seunit {1} · berkesan {2} ({3})',
+  'ticket.downLine': 'Fi hiliran {0} · pelarasan seunit {1} · berkesan {2} ({3})',
+  'ticket.lineRecv': '  #{0} {1} → Diterima {2}', 'ticket.linePay': '  #{0} {1} → Dibayar {2}',
+  'ticket.lineBoth': '  #{0} {1} → Diterima {2} / Dibayar {3}',
+  'ticket.subRecv': '  Jumlah diterima {0} ({1} catatan)', 'ticket.subPay': '  Jumlah dibayar {0} ({1} catatan)',
+  'ticket.subAll': '  Jumlah diterima {0} · dibayar {1} · untung kasar {2} ({3} catatan)',
+  'ticket.totalRecv': '✅ Jumlah diterima (pendapatan kami) {0} ({1} peraturan · {2} catatan)',
+  'ticket.totalPay': '✅ Jumlah dibayar (kepada hiliran) {0} ({1} peraturan · {2} catatan · {3} pedagang)',
+  'ticket.totalAll': '💰 Jumlah diterima {0} · dibayar {1} · untung kasar {2} ({3} peraturan · {4} catatan · {5} pedagang)',
+  'ticket.totalAllNoM': '💰 Jumlah diterima {0} · dibayar {1} · untung kasar {2} ({3} peraturan · {4} catatan)',
+  'ticket.merchant': 'Pedagang: ', 'ticket.noMerchant': '(tiada pedagang)', 'ticket.merchantParen': ' (pedagang: {0})',
+  'ticket.mSubHead': '— Jumlah pedagang —',
+  'ticket.mSubAll': 'Diterima {0} · dibayar {1} · untung kasar {2} ({3} peraturan · {4} catatan)',
+  'ticket.mSubPay': 'Dibayar {0} ({1} peraturan · {2} catatan)',
+  'ticket.noName': 'Peraturan tanpa nama',
+  'formula.rateWord': 'Kadar', 'formula.adjRate': '(Kadar {0})',
+  'formula.recv': 'Diterima = Σ(Jumlah × {0} × (1 − Fi huliran))',
+  'formula.pay': 'Dibayar = Σ(Jumlah × {0} × (1 − Fi kami)){1}',
+  'formula.gasSuffix': ' − 1.2 × catatan (Gas ditanggung pedagang)',
+  'pf.pos': 'Positif bermaksud untung', 'pf.neg': 'Untung kasar negatif (rugi)',
+  'csv.header': 'Masa,Jenis,Tajuk,Pedagang Hiliran,Kumpulan,Peraturan,Mata Wang Jumlah,Jumlah,Mata Wang Penyelesaian,Kadar,Fi Huliran %,Pelarasan Seunit Huliran,Fi Kami %,Pelarasan Seunit Hiliran,Pedagang Tanggung Gas,Diterima,Dibayar,Untung Kasar,No. Resit,Catatan',
+  'csv.gasYes': 'Ya (1.2U)', 'csv.gasNo': 'Tidak',
+  'fn.csv': 'lejar-fi', 'fn.rules': 'peraturan-penyelesaian', 'fn.ledgerJson': 'data-akaun-fi'
+};
+
+/** Tiếng Việt */
+I18N.vi = {
+  'app.title': 'Máy Tính Quyết Toán Phí',
+  'app.name': 'Máy Tính Quyết Toán Phí',
+  'app.sub': 'Quyết toán thượng/hạ nguồn & ghi sổ cho đơn thu hộ (dữ liệu lưu trong trình duyệt tại máy)',
+  'app.footer': 'Máy Tính Quyết Toán Phí · Phiên bản cục bộ một tệp v11 · Dữ liệu được lưu trong localStorage của trình duyệt, không tải lên bất kỳ máy chủ nào',
+  'btn.customCur': '＋ Tiền tệ tùy chỉnh', 'btn.cloudBackup': '☁ Sao lưu đám mây', 'btn.exportRules': 'Xuất quy tắc',
+  'btn.exportLedger': 'Xuất sổ', 'btn.import': 'Nhập', 'btn.exportCsv': 'Xuất CSV', 'btn.clearLedger': 'Xóa sổ',
+  'btn.saveRule': '💾 Lưu quy tắc', 'btn.applyRule': 'Áp dụng quy tắc ▾', 'btn.addNextRule': '＋ Thêm quy tắc tiếp theo',
+  'btn.genUpTicket': '📋 Tạo phiếu thượng nguồn', 'btn.genDownTicket': '📋 Tạo phiếu hạ nguồn',
+  'btn.remarkPresets': 'Hay dùng ▾', 'btn.post': '✓ Ghi sổ một lần', 'btn.reset': 'Đặt lại',
+  'btn.upTicket': '📋 Phiếu thượng nguồn', 'btn.downTicket': '📋 Phiếu hạ nguồn', 'btn.combinedTicket': '📋 Phiếu tổng hợp',
+  'btn.clearDraft': 'Xóa bản nháp', 'btn.clearFilters': 'Xóa bộ lọc', 'btn.cancel': 'Hủy', 'btn.add': 'Thêm',
+  'btn.close': 'Đóng', 'btn.copyTicket': 'Sao chép phiếu', 'btn.copied': 'Đã sao chép ✓',
+  'btn.testConn': 'Kiểm tra kết nối', 'btn.backupNow': 'Sao lưu ngay', 'btn.restore': 'Khôi phục từ đám mây', 'btn.saveSettings': 'Lưu cài đặt',
+  'calc.title': 'Máy tính đơn thu hộ', 'calc.tag': 'Tính tức thì',
+  'ph.header': 'Đơn vị chúng tôi (không bắt buộc, chỉ dùng cho phiếu ghi sổ/tổng hợp)', 'ph.batch': 'Số lô (VD: 0920-A)',
+  'ph.ruleName': 'Tên quy tắc/kinh doanh, VD: Kế hoạch A châu Âu', 'ph.merchant': 'Đối tác hạ nguồn (VD: EC Markets)',
+  'ph.fee': 'VD: 0.5 (để trống = 0)', 'ph.adj': 'VD: +0.5 / -0.3, để trống nếu không có',
+  'ph.remark': 'Ghi chú (không bắt buộc, VD: đợt 1 tháng 5)',
+  'ph.rateManual': 'Nhập tỷ giá từ thượng nguồn', 'ph.rateApprox': 'VD: {0} (tham khảo, lấy theo thực tế)',
+  'ph.filter': 'Lọc theo ghi chú / đơn vị / đối tác / lô / quy tắc / số phiếu',
+  'ph.amountRow': 'Số tiền {0} (ngoại tệ gốc)',
+  'ph.curCode': 'VD: THB', 'ph.curName': 'VD: Baht Thái',
+  'ph.ghOwner': 'VD: octocat', 'ph.ghRepo': 'VD: fee-data', 'ph.ghBranch': 'main (mặc định)',
+  'ph.ghPath': 'fee-calculator/data.json (mặc định)', 'ph.ghToken': 'github_pat_… / ghp_…',
+  'opt.usePrevRate': 'Dùng tỷ giá trước đó', 'opt.gasFee': 'Đối tác chịu Gas Fee (trừ thêm 1.2U vào số chi)',
+  'panel.global': 'Tham số chung', 'panel.up': 'Quyết toán thượng nguồn (Chúng tôi ← Thượng nguồn)', 'panel.down': 'Quyết toán hạ nguồn (Chúng tôi → Hạ nguồn)',
+  'label.ratePair': 'Tỷ giá ({0} → {1})',
+  'label.amounts': 'Số tiền (ngoại tệ gốc)',
+  'label.feeUp': 'Phí suất thượng nguồn (%)', 'label.feeDown': 'Phí suất chúng tôi thu từ hạ nguồn (%)',
+  'label.adjUp': 'Điều chỉnh đơn giá tỷ giá thượng nguồn (± {1} mỗi 1 {0})', 'label.adjDown': 'Điều chỉnh đơn giá tỷ giá hạ nguồn (± {1} mỗi 1 {0})',
+  'label.effUp': 'Tỷ giá sau phí thượng nguồn (nhận {1} mỗi 1 {0})', 'label.effDown': 'Tỷ giá sau phí hạ nguồn (trả {1} mỗi 1 {0})',
+  'label.subRecv': 'Tổng thực thu (thu nhập của chúng tôi)', 'label.subPay': 'Tổng thực chi (trả cho hạ nguồn)',
+  'label.profit': 'Lãi gộp (Thu − Chi)', 'label.settleCur': 'Tiền tệ thanh toán: ',
+  'hint.amounts': 'Nhập số dương sẽ tự động thêm dòng mới; nhập 0 thì không thêm',
+  'hint.clickCopy': 'Bấm để sao chép',
+  'hint.post': 'Không có bản nháp thì ghi quy tắc hiện tại; có bản nháp thì ghi tất cả quy tắc một lần (ghi theo đối tác hạ nguồn của từng quy tắc)',
+  'err.ratePositive': 'Tỷ giá phải là số dương', 'err.amounts': 'Hãy nhập ít nhất một số tiền hợp lệ',
+  'err.feeRange': 'Phí suất phải từ 0 đến 100',
+  'err.adj': 'Giá trị điều chỉnh phải là số; tỷ giá + điều chỉnh phải dương',
+  'title.copyEffRate': 'Bấm để sao chép tỷ giá sau phí', 'title.copyRecv': 'Bấm để sao chép số tiền thực thu', 'title.copyPay': 'Bấm để sao chép số tiền thực chi',
+  'title.ledgerTicket': 'Xem phiếu đầy đủ của bút toán này', 'title.rmDel': 'Xóa mục này', 'title.ruleDel': 'Xóa quy tắc này',
+  'notice.invalid': 'Vui lòng sửa các ô nhập bị tô đỏ phía trên trước khi tính toán và ghi sổ.',
+  'stat.count': 'Tổng số bút', 'stat.recv': 'Tổng thực thu', 'stat.pay': 'Tổng thực chi', 'stat.gross': 'Tổng lãi gộp',
+  'draft.title': 'Bản nháp phiếu', 'draft.count': '{0} quy tắc', 'draft.remove': 'Bỏ',
+  'draft.empty': 'Chưa có bản nháp: thêm quy tắc kinh doanh cho từng đối tác (điền "Đối tác hạ nguồn" + "Tên quy tắc" + phí/số tiền), bấm "＋ Thêm quy tắc tiếp theo" để tạm lưu, rồi ghi sổ / tạo phiếu một lần; không có bản nháp thì dùng ô nhập hiện tại.',
+  'draft.metaEntries': '{0} bút', 'draft.metaRate': 'Tỷ giá {0}', 'draft.gasMark': 'gồm Gas',
+  'draft.subRecv': 'Tổng thực thu', 'draft.subPay': 'Tổng thực chi', 'draft.gross': 'Lãi gộp',
+  'rule.current': 'Kinh doanh hiện tại',
+  'ruleSummary': 'Trên {0}%{1} / Dưới {2}%{3}',
+  'rm.empty': 'Chưa có ghi chú hay dùng: nhập vào ô trước, rồi lưu bằng nút bên dưới',
+  'rm.save': '＋ Lưu nội dung ô nhập thành hay dùng', 'rm.needInput': 'Hãy nhập ghi chú vào ô bên trái trước',
+  'ruleMenu.empty': 'Chưa có quy tắc đã lưu: điền phí, nhập tên quy tắc, rồi bấm "💾 Lưu quy tắc"',
+  'msg.needRuleNameBtn': 'Hãy nhập tên quy tắc trước', 'msg.ruleSaved': 'Đã lưu ✓',
+  'ledger.title': 'Sổ ghi chép', 'ledger.empty': 'Chưa có bút toán nào',
+  'ledger.typeColl': 'Thu hộ', 'ledger.gasTag': 'gồm Gas', 'ledger.ticketBtn': 'Phiếu', 'ledger.delBtn': 'Xóa',
+  'ledger.countTag': '{0} bút (trong {1})', 'ledger.totalRow': 'Tổng ({0} bút được lọc)',
+  'ledger.col.time': 'Thời gian', 'ledger.col.type': 'Loại', 'ledger.col.header': 'Đơn vị', 'ledger.col.merchant': 'Đối tác',
+  'ledger.col.batch': 'Lô', 'ledger.col.rule': 'Quy tắc', 'ledger.col.amount': 'Số tiền', 'ledger.col.rate': 'Tỷ giá',
+  'ledger.col.feeUp': 'Phí thượng nguồn', 'ledger.col.feeDown': 'Phí chúng tôi', 'ledger.col.recv': 'Thực thu', 'ledger.col.pay': 'Thực chi',
+  'ledger.col.gross': 'Lãi gộp', 'ledger.col.remark': 'Ghi chú', 'ledger.col.actions': 'Thao tác',
+  'filter.to': 'đến',
+  'cur.title': 'Thêm tiền tệ tùy chỉnh', 'cur.code': 'Mã tiền tệ', 'cur.name': 'Tên tiền tệ',
+  'cur.noDecimal': 'Tiền tệ không có phần thập phân (làm tròn hiển thị, VD: JPY / KRW)',
+  'cur.errCode': 'Mã tiền tệ phải gồm 2–4 chữ cái Latin (VD: THB)', 'cur.errName': 'Vui lòng nhập tên tiền tệ',
+  'cur.errDup': 'Mã tiền tệ {0} đã tồn tại', 'cur.added': 'Đã thêm',
+  'cur.addedMsg': 'Tiền tệ {0} ({1}) đã được thêm và có thể chọn trong danh sách.',
+  'cur.searchPh': 'Tìm mã / tên…', 'cur.custom': ' (tùy chỉnh)', 'cur.noMatch': 'Không có tiền tệ phù hợp',
+  'ticketModal.hint': 'Phiên bản v11 · Mọi số trong phiếu được bọc trong dấu huyền đơn để có thể chạm sao chép từng số sau khi dán vào Telegram. Nếu không thấy thông báo này, bạn đang dùng trang cũ; vui lòng đóng và mở lại index.html.',
+  'cf.title': 'Xác nhận', 'btn.ok': 'Đã hiểu', 'btn.confirm': 'Xác nhận',
+  'msg.tip': 'Thông báo', 'msg.delTitle': 'Xóa bút toán này?', 'msg.delMsg': 'Không thể hoàn tác sau khi xóa. Vui lòng xác nhận.',
+  'msg.ledgerEmpty': 'Sổ hiện đang trống.', 'msg.clearTitle': 'Xóa toàn bộ bút toán?',
+  'msg.clearMsg': 'Toàn bộ {0} bút toán sẽ bị xóa, không thể hoàn tác. Vui lòng cân nhắc kỹ.',
+  'msg.csvEmpty': 'Không có bút toán nào để xuất với bộ lọc hiện tại.',
+  'msg.rulesEmpty': 'Chưa có quy tắc để xuất: hãy lưu quy tắc trước.',
+  'msg.ledgerNoExport': 'Sổ trống, không có gì để xuất.',
+  'msg.importFail': 'Nhập thất bại', 'msg.notJson': 'Tệp không phải JSON hợp lệ.',
+  'msg.unknownFormat': 'Không nhận diện được định dạng tệp: vui lòng nhập tệp JSON "quy tắc" hoặc "sổ" do công cụ này xuất.',
+  'msg.importDone': 'Nhập hoàn tất',
+  'msg.rulesImported': 'Đã nhập quy tắc: thêm {0}, ghi đè {1} (hiện có {2}).',
+  'msg.ledgerImported': 'Đã nhập bút toán: thêm {0} (hiện có {1}).',
+  'msg.fixInputs': 'Vui lòng sửa các ô nhập bị tô đỏ trước.',
+  'msg.fixInputsDraft': 'Vui lòng sửa các ô nhập bị tô đỏ trước khi thêm quy tắc vào bản nháp.',
+  'msg.fixInputsTicket': 'Vui lòng sửa các ô nhập bị tô đỏ trước khi tạo phiếu.',
+  'msg.needRuleName': 'Thiếu tên quy tắc',
+  'msg.needRuleNameMsg': 'Vui lòng nhập tên vào ô "Tên quy tắc/kinh doanh" (VD: Kế hoạch A châu Âu) trước khi thêm quy tắc tiếp theo.',
+  'msg.clearDraftTitle': 'Xóa bản nháp phiếu?',
+  'msg.clearDraftMsg': 'Toàn bộ {0} bản nháp quy tắc sẽ bị xóa (không ảnh hưởng sổ và quy tắc đã lưu).',
+  'msg.validateFail': 'Kiểm tra không đạt',
+  'msg.validateFailMsg': 'Quy tắc thứ {0} "{1}" có tỷ giá/phí/số tiền không hợp lệ; đã chặn ghi sổ.',
+  'msg.postedTitle': 'Đã ghi sổ',
+  'msg.postedMsg': 'Đã ghi {0} quy tắc · {1} bút · thực thu {2} · thực chi {3}. Số phiếu liên quan {4} (nút "Phiếu" trong sổ xem được toàn bộ thông tin đơn).',
+  'gh.title': '☁ Sao lưu đám mây GitHub',
+  'gh.desc': 'Sao lưu sổ / quy tắc / tiền tệ tùy chỉnh / ghi chú hay dùng vào kho GitHub của chính bạn (tệp JSON); khôi phục và hợp nhất khi đổi máy tính hoặc trình duyệt. Token chỉ lưu trong trình duyệt tại máy và không gửi cho bên thứ ba nào.',
+  'gh.owner': 'Tên người dùng GitHub (Owner)', 'gh.repo': 'Tên kho (nên dùng kho riêng tư)', 'gh.branch': 'Nhánh',
+  'gh.path': 'Đường dẫn tệp sao lưu',
+  'gh.token': 'Personal Access Token (cấp quyền Contents: Read and write cho kho)',
+  'gh.err401': 'Token không hợp lệ hoặc đã hết hạn (401)',
+  'gh.err403': 'Không có quyền (403): kiểm tra Token đã được cấp quyền đọc/ghi Contents của kho chưa',
+  'gh.err404': 'Kho / nhánh / đường dẫn tệp không tồn tại (404)',
+  'gh.err409': 'Tệp trên đám mây đã thay đổi (409): vui lòng thử lại',
+  'gh.errHttp': 'Yêu cầu thất bại (HTTP {0}): {1}',
+  'gh.needOwnerRepo': 'Vui lòng nhập ít nhất tên người dùng và tên kho.', 'gh.saved': 'Cài đặt đã lưu vào trình duyệt này.',
+  'gh.needToken': 'Vui lòng nhập Token.', 'gh.connecting': 'Đang kết nối…',
+  'gh.connOk': '✓ Kết nối thành công: {0} (kho riêng tư)', 'gh.connOkPub': '✓ Kết nối thành công: {0} (kho công khai)',
+  'gh.netErr': 'Lỗi mạng: {0}',
+  'gh.needAll': 'Vui lòng điền đủ tên người dùng / tên kho / Token trước.', 'gh.backingUp': 'Đang sao lưu…',
+  'gh.commitMsg': 'Sao lưu máy tính phí {0}',
+  'gh.backupOk': '✓ Sao lưu thành công ({0}, commit {1})', 'gh.reading': 'Đang đọc dữ liệu đám mây…',
+  'gh.noFile': 'Chưa có tệp sao lưu trên đám mây: hãy "Sao lưu ngay" trước.',
+  'gh.parseErr': 'Không thể phân tích nội dung tệp trên đám mây.', 'gh.notBackup': 'Tệp trên đám mây không phải tệp sao lưu của công cụ này.',
+  'gh.restoreTitle': 'Khôi phục từ đám mây?',
+  'gh.restoreMsg': 'Thời gian sao lưu trên đám mây: {0} ({1} bút / {2} quy tắc).\nSẽ hợp nhất với dữ liệu cục bộ: bút toán được thêm có kiểm tra trùng id, quy tắc trùng tên bị ghi đè; dữ liệu cục bộ hiện có không bị xóa.',
+  'gh.unknownTime': 'thời gian không rõ',
+  'gh.restoreOk': '✓ Khôi phục hoàn tất: thêm {0} bút, quy tắc thêm {1} / cập nhật {2}.',
+  'ticket.t.up': 'Phiếu quyết toán thượng nguồn', 'ticket.t.down': 'Phiếu quyết toán hạ nguồn', 'ticket.t.all': 'Phiếu tổng hợp quyết toán (nội bộ)',
+  'ticket.t.ledger': 'Phiếu quyết toán · Thông tin đầy đủ', 'ticket.t.allModal': 'Phiếu tổng hợp quyết toán',
+  'ticket.time': 'Thời gian: ', 'ticket.pair': 'Cặp tiền tệ: ', 'ticket.header': 'Đơn vị chúng tôi: ', 'ticket.batch': 'Lô: ',
+  'ticket.remark': 'Ghi chú: ',
+  'ticket.gas': ' (Đối tác chịu Gas Fee)', 'ticket.inclGas': ' (gồm Gas)',
+  'ticket.rateLine': 'Tỷ giá {0} ({1} → {2})',
+  'ticket.upLine': 'Thượng nguồn phí {0} · đơn giá {1} · sau phí {2} ({3})',
+  'ticket.downLine': 'Hạ nguồn phí {0} · đơn giá {1} · sau phí {2} ({3})',
+  'ticket.lineRecv': '  #{0} {1} → Thực thu {2}', 'ticket.linePay': '  #{0} {1} → Thực chi {2}',
+  'ticket.lineBoth': '  #{0} {1} → Thực thu {2} / Thực chi {3}',
+  'ticket.subRecv': '  Tổng thực thu {0} ({1} bút)', 'ticket.subPay': '  Tổng thực chi {0} ({1} bút)',
+  'ticket.subAll': '  Tổng thực thu {0} · thực chi {1} · lãi gộp {2} ({3} bút)',
+  'ticket.totalRecv': '✅ Tổng thực thu (thu nhập của chúng tôi) {0} ({1} quy tắc · {2} bút)',
+  'ticket.totalPay': '✅ Tổng thực chi (trả hạ nguồn) {0} ({1} quy tắc · {2} bút · {3} đối tác)',
+  'ticket.totalAll': '💰 Tổng cộng thực thu {0} · thực chi {1} · lãi gộp {2} ({3} quy tắc · {4} bút · {5} đối tác)',
+  'ticket.totalAllNoM': '💰 Tổng cộng thực thu {0} · thực chi {1} · lãi gộp {2} ({3} quy tắc · {4} bút)',
+  'ticket.merchant': 'Đối tác: ', 'ticket.noMerchant': '(chưa điền đối tác)', 'ticket.merchantParen': ' (đối tác: {0})',
+  'ticket.mSubHead': '— Tổng đối tác —',
+  'ticket.mSubAll': 'Thực thu {0} · thực chi {1} · lãi gộp {2} ({3} quy tắc · {4} bút)',
+  'ticket.mSubPay': 'Thực chi {0} ({1} quy tắc · {2} bút)',
+  'ticket.noName': 'Quy tắc chưa đặt tên',
+  'formula.rateWord': 'Tỷ giá', 'formula.adjRate': '(Tỷ giá {0})',
+  'formula.recv': 'Thực thu = Σ(Số tiền × {0} × (1 − Phí thượng nguồn))',
+  'formula.pay': 'Thực chi = Σ(Số tiền × {0} × (1 − Phí chúng tôi)){1}',
+  'formula.gasSuffix': ' − 1.2 × số bút (Đối tác chịu Gas)',
+  'pf.pos': 'Số dương là lãi', 'pf.neg': 'Lãi gộp âm (lỗ)',
+  'csv.header': 'Thời gian,Loại,Đơn vị,Đối tác hạ nguồn,Lô,Quy tắc,Tiền gốc,Số tiền,Tiền thanh toán,Tỷ giá,Phí thượng nguồn %,Điều chỉnh đơn giá thượng,Phí chúng tôi %,Điều chỉnh đơn giá hạ,Đối tác chịu Gas,Thực thu,Thực chi,Lãi gộp,Số phiếu,Ghi chú',
+  'csv.gasYes': 'Có (1.2U)', 'csv.gasNo': 'Không',
+  'fn.csv': 'so-phi', 'fn.rules': 'quy-tac-quyet-toan', 'fn.ledgerJson': 'du-lieu-so-phi'
+};
+
+/** 按当前语言查词典：缺失回退 zh，再缺失返回 key 本身 */
+function t(key) {
+  var lang = state && state.lang ? state.lang : 'zh';
+  if (I18N[lang] && Object.prototype.hasOwnProperty.call(I18N[lang], key)) return I18N[lang][key];
+  if (I18N.zh && Object.prototype.hasOwnProperty.call(I18N.zh, key)) return I18N.zh[key];
+  return key;
+}
+
+/** 带参翻译：{0}{1}… 占位符依次替换为 args 数组元素 */
+function tf(key, args) {
+  var s = t(key);
+  if (!args) return s;
+  for (var i = 0; i < args.length; i++) {
+    s = s.replace(new RegExp('\\{' + i + '\\}', 'g'), String(args[i] === undefined ? '' : args[i]));
+  }
+  return s;
+}
+
+/** 把静态 HTML 上标注的 data-i18n / data-i18n-ph / data-i18n-title 统一应用为当前语言 */
+function applyI18n() {
+  var lang = state && state.lang ? state.lang : 'zh';
+  document.documentElement.setAttribute('lang', lang === 'zh' ? 'zh-CN' : lang);
+  document.title = t('app.title');
+  var els = document.querySelectorAll('[data-i18n]');
+  for (var i = 0; i < els.length; i++) els[i].textContent = t(els[i].getAttribute('data-i18n'));
+  var phs = document.querySelectorAll('[data-i18n-ph]');
+  for (var j = 0; j < phs.length; j++) phs[j].setAttribute('placeholder', t(phs[j].getAttribute('data-i18n-ph')));
+  var tts = document.querySelectorAll('[data-i18n-title]');
+  for (var k = 0; k < tts.length; k++) tts[k].setAttribute('title', t(tts[k].getAttribute('data-i18n-title')));
+}
+
+/** 切换语言：持久化 + 全界面（静态与动态区域）立即刷新 */
+function setLang(lang) {
+  if (!I18N[lang]) lang = 'zh';
+  state.lang = lang;
+  saveToLS(LS_LANG, lang);
+  var sel = document.getElementById('langSelect');
+  if (sel) sel.value = lang;
+  applyI18n();
+  buildCurrencyPickers();
+  refreshPrefixes();
+  renderAmountList();
+  renderDraft();
+  renderRuleMenu();
+  renderRemarkMenu();
+  recalc();
+  renderLedger();
+}
+
+/** 语言选择器回调 */
+function onLangChange(lang) { setLang(lang); }
+
+/** 内置货币：symbol=符号，noDecimal=是否无小数货币，usd=1 单位该货币 ≈ 多少 USD（大概值，仅用于汇率参考提示） */
+var BUILTIN_CURRENCIES = [
+  // 稳定币 / 主流
+  { code: 'USDT', name: '泰达币', symbol: 'USDT ', noDecimal: false, usd: 1 },
+  { code: 'USDC', name: 'USD Coin', symbol: 'USDC ', noDecimal: false, usd: 1 },
+  { code: 'USD',  name: '美元',   symbol: '$',  noDecimal: false, usd: 1 },
+  { code: 'EUR',  name: '欧元',   symbol: '€',  noDecimal: false, usd: 1.08 },
+  { code: 'GBP',  name: '英镑',   symbol: '£',  noDecimal: false, usd: 1.27 },
+  { code: 'CHF',  name: '瑞士法郎', symbol: 'Fr', noDecimal: false, usd: 1.13 },
+  // 亚太
+  { code: 'JPY',  name: '日元',   symbol: '¥',  noDecimal: true,  usd: 0.0067 },
+  { code: 'KRW',  name: '韩元',   symbol: '₩',  noDecimal: true,  usd: 0.00074 },
+  { code: 'CNY',  name: '人民币', symbol: '¥',  noDecimal: false, usd: 0.14 },
+  { code: 'HKD',  name: '港币',   symbol: 'HK$', noDecimal: false, usd: 0.128 },
+  { code: 'TWD',  name: '新台币', symbol: 'NT$', noDecimal: false, usd: 0.031 },
+  { code: 'SGD',  name: '新加坡元', symbol: 'S$', noDecimal: false, usd: 0.74 },
+  { code: 'AUD',  name: '澳元',   symbol: 'A$', noDecimal: false, usd: 0.66 },
+  { code: 'NZD',  name: '新西兰元', symbol: 'NZ$', noDecimal: false, usd: 0.61 },
+  { code: 'MYR',  name: '马来西亚林吉特', symbol: 'RM', noDecimal: false, usd: 0.22 },
+  { code: 'THB',  name: '泰铢',   symbol: '฿',  noDecimal: false, usd: 0.028 },
+  { code: 'PHP',  name: '菲律宾比索', symbol: '₱', noDecimal: false, usd: 0.017 },
+  { code: 'IDR',  name: '印尼盾', symbol: 'Rp', noDecimal: true,  usd: 0.000063 },
+  { code: 'VND',  name: '越南盾', symbol: '₫',  noDecimal: true,  usd: 0.00004 },
+  { code: 'INR',  name: '印度卢比', symbol: '₹', noDecimal: false, usd: 0.012 },
+  { code: 'PKR',  name: '巴基斯坦卢比', symbol: 'Rs', noDecimal: false, usd: 0.0036 },
+  { code: 'BDT',  name: '孟加拉塔卡', symbol: '৳', noDecimal: false, usd: 0.0085 },
+  { code: 'LKR',  name: '斯里兰卡卢比', symbol: 'Rs', noDecimal: false, usd: 0.0033 },
+  { code: 'NPR',  name: '尼泊尔卢比', symbol: 'Rs', noDecimal: false, usd: 0.0075 },
+  { code: 'KZT',  name: '哈萨克斯坦坚戈', symbol: '₸', noDecimal: false, usd: 0.0021 },
+  { code: 'UZS',  name: '乌兹别克斯坦苏姆', symbol: 'UZS ', noDecimal: true, usd: 0.00008 },
+  { code: 'MNT',  name: '蒙古图格里克', symbol: '₮', noDecimal: true, usd: 0.00029 },
+  { code: 'MMK',  name: '缅甸元', symbol: 'K',  noDecimal: true,  usd: 0.00048 },
+  { code: 'KHR',  name: '柬埔寨瑞尔', symbol: '៛', noDecimal: true,  usd: 0.00024 },
+  { code: 'LAK',  name: '老挝基普', symbol: '₭', noDecimal: true,  usd: 0.000046 },
+  { code: 'BND',  name: '文莱元', symbol: 'B$', noDecimal: false, usd: 0.74 },
+  // 美洲
+  { code: 'CAD',  name: '加元',   symbol: 'C$', noDecimal: false, usd: 0.73 },
+  { code: 'MXN',  name: '墨西哥比索', symbol: 'Mex$', noDecimal: false, usd: 0.058 },
+  { code: 'BRL',  name: '巴西雷亚尔', symbol: 'R$', noDecimal: false, usd: 0.18 },
+  { code: 'ARS',  name: '阿根廷比索', symbol: 'AR$', noDecimal: false, usd: 0.001 },
+  { code: 'CLP',  name: '智利比索', symbol: 'CLP$', noDecimal: true, usd: 0.00105 },
+  { code: 'COP',  name: '哥伦比亚比索', symbol: 'COL$', noDecimal: true, usd: 0.00025 },
+  { code: 'PEN',  name: '秘鲁索尔', symbol: 'S/', noDecimal: false, usd: 0.27 },
+  { code: 'UYU',  name: '乌拉圭比索', symbol: '$U', noDecimal: false, usd: 0.026 },
+  // 欧洲
+  { code: 'SEK',  name: '瑞典克朗', symbol: 'kr', noDecimal: false, usd: 0.095 },
+  { code: 'NOK',  name: '挪威克朗', symbol: 'kr', noDecimal: false, usd: 0.093 },
+  { code: 'DKK',  name: '丹麦克朗', symbol: 'kr', noDecimal: false, usd: 0.145 },
+  { code: 'PLN',  name: '波兰兹罗提', symbol: 'zł', noDecimal: false, usd: 0.25 },
+  { code: 'CZK',  name: '捷克克朗', symbol: 'Kč', noDecimal: false, usd: 0.043 },
+  { code: 'HUF',  name: '匈牙利福林', symbol: 'Ft', noDecimal: false, usd: 0.0028 },
+  { code: 'RON',  name: '罗马尼亚列伊', symbol: 'lei', noDecimal: false, usd: 0.21 },
+  { code: 'TRY',  name: '土耳其里拉', symbol: '₺', noDecimal: false, usd: 0.029 },
+  { code: 'RUB',  name: '俄罗斯卢布', symbol: '₽', noDecimal: false, usd: 0.011 },
+  { code: 'UAH',  name: '乌克兰格里夫纳', symbol: '₴', noDecimal: false, usd: 0.024 },
+  { code: 'ISK',  name: '冰岛克朗', symbol: 'kr', noDecimal: false, usd: 0.0073 },
+  // 中东 / 非洲
+  { code: 'SAR',  name: '沙特里亚尔', symbol: '﷼', noDecimal: false, usd: 0.267 },
+  { code: 'AED',  name: '阿联酋迪拉姆', symbol: 'د.إ', noDecimal: false, usd: 0.272 },
+  { code: 'QAR',  name: '卡塔尔里亚尔', symbol: '﷼', noDecimal: false, usd: 0.275 },
+  { code: 'KWD',  name: '科威特第纳尔', symbol: 'KD', noDecimal: false, usd: 3.25 },
+  { code: 'BHD',  name: '巴林第纳尔', symbol: 'BD', noDecimal: false, usd: 2.65 },
+  { code: 'OMR',  name: '阿曼里亚尔', symbol: '﷼', noDecimal: false, usd: 2.6 },
+  { code: 'JOD',  name: '约旦第纳尔', symbol: 'JD', noDecimal: false, usd: 1.41 },
+  { code: 'ILS',  name: '以色列谢克尔', symbol: '₪', noDecimal: false, usd: 0.27 },
+  { code: 'EGP',  name: '埃及镑', symbol: 'E£', noDecimal: false, usd: 0.021 },
+  { code: 'NGN',  name: '尼日利亚奈拉', symbol: '₦', noDecimal: false, usd: 0.00065 },
+  { code: 'ZAR',  name: '南非兰特', symbol: 'R', noDecimal: false, usd: 0.055 },
+  { code: 'KES',  name: '肯尼亚先令', symbol: 'KSh', noDecimal: false, usd: 0.0078 },
+  { code: 'GHS',  name: '加纳塞地', symbol: '₵', noDecimal: false, usd: 0.065 },
+  { code: 'MAD',  name: '摩洛哥迪拉姆', symbol: 'DH', noDecimal: false, usd: 0.1 },
+  { code: 'TND',  name: '突尼斯第纳尔', symbol: 'DT', noDecimal: false, usd: 0.32 },
+  { code: 'DZD',  name: '阿尔及利亚第纳尔', symbol: 'DA', noDecimal: false, usd: 0.0075 }
+];
+
+/** 应用状态（当前计算输入 + 账本） */
+var state = {
+  lang: 'zh',             // 界面语言（zh/en/ms/vi，v11 i18n）
+  currencyFrom: 'EUR',   // 原始货币（金额货币）
+  currencyTo: 'USDT',    // 结算货币（默认 USDT；若用户上次选择过则取上次选择）
+  ledger: [],            // 账本数组
+  customCurrencies: [],  // 用户自定义货币
+  remarkPresets: [],     // 备注常用选项（用户自定义，localStorage 持久化）
+  rulePresets: []        // 结算规则预设（费率方案，localStorage 持久化，v7）
+};
+
+/** 判断某货币代码是否在可用货币列表中（内置 + 自定义） */
+function isKnownCurrency(code) {
+  var all = getAllCurrencies();
+  for (var i = 0; i < all.length; i++) {
+    if (all[i].code === code) return true;
+  }
+  return false;
+}
+
+/** 读取 localStorage（容错：JSON 解析失败时返回默认值） */
+function loadFromLS(key, fallback) {
+  try {
+    var raw = localStorage.getItem(key);
+    if (!raw) return fallback;
+    var val = JSON.parse(raw);
+    return (val === null || val === undefined) ? fallback : val;
+  } catch (e) {
+    return fallback;
+  }
+}
+
+/** 写入 localStorage（容错：隐私模式等场景失败不中断） */
+function saveToLS(key, value) {
+  try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) { /* 忽略写入异常 */ }
+}
+
+/** 取全部货币（内置 + 自定义） */
+function getAllCurrencies() {
+  return BUILTIN_CURRENCIES.concat(state.customCurrencies);
+}
+
+/** 按代码查货币信息，找不到返回安全默认对象 */
+function findCurrency(code) {
+  var all = getAllCurrencies();
+  for (var i = 0; i < all.length; i++) {
+    if (all[i].code === code) return all[i];
+  }
+  return { code: code, name: code, symbol: code, noDecimal: false };
+}
+
+/* ============================================================
+   二、计算逻辑（纯函数，处理浮点误差）
+   ============================================================ */
+
+/**
+ * 精确解析用户输入的数字（去空格、去逗号）
+ * @returns {number|null} 非法则返回 null
+ */
+function parseNum(str) {
+  if (typeof str !== 'string') return null;
+  var s = str.replace(/[\s,，]/g, '');
+  if (s === '' || isNaN(Number(s))) return null;
+  return Number(s);
+}
+
+/**
+ * 解析可选数字输入：空串视为 0，非法返回 null
+ */
+function parseNumOptional(str) {
+  var s = (str || '').replace(/[\s,，]/g, '');
+  if (s === '' || s === '+' || s === '-') return 0;
+  if (isNaN(Number(s))) return null;
+  return Number(s);
+}
+
+/**
+ * 校验输入：金额/汇率为正数，费率为 0–100（可留空 = 0），单价调整可为正负（汇率+调整须为正）
+ * @returns {{ok:boolean, amount:number, rate:number, feeUp:number, feeDown:number, adjUp:number, adjDown:number}}
+ */
+function validateInputs() {
+  var amount = parseNum(document.getElementById('amount').value);
+  var rate = parseNum(document.getElementById('rate').value);
+  var feeUp = parseNumOptional(document.getElementById('feeUp').value);
+  var feeDown = parseNumOptional(document.getElementById('feeDown').value);
+  var adjUp = parseNumOptional(document.getElementById('adjUp').value);
+  var adjDown = parseNumOptional(document.getElementById('adjDown').value);
+
+  var okAmount = amount !== null && amount > 0;
+  var okRate = rate !== null && rate > 0;
+  var okFeeUp = feeUp !== null && feeUp >= 0 && feeUp <= 100;
+  var okFeeDown = feeDown !== null && feeDown >= 0 && feeDown <= 100;
+  // 单价调整：数字合法 + 调整后汇率（汇率 + 调整）须为正
+  var okAdjUp = adjUp !== null && (!okRate || rate + adjUp > 0);
+  var okAdjDown = adjDown !== null && (!okRate || rate + adjDown > 0);
+
+  toggleFieldError('f-amount', !okAmount);
+  toggleFieldError('f-rate', !okRate);
+  toggleFieldError('f-feeUp', !okFeeUp);
+  toggleFieldError('f-feeDown', !okFeeDown);
+  toggleFieldError('f-adjUp', !okAdjUp);
+  toggleFieldError('f-adjDown', !okAdjDown);
+
+  return {
+    ok: okAmount && okRate && okFeeUp && okFeeDown && okAdjUp && okAdjDown,
+    amount: okAmount ? amount : 0,
+    rate: okRate ? rate : 0,
+    feeUp: okFeeUp ? (feeUp || 0) : 0,
+    feeDown: okFeeDown ? (feeDown || 0) : 0,
+    adjUp: (okAdjUp && adjUp) ? adjUp : 0,
+    adjDown: (okAdjDown && adjDown) ? adjDown : 0
+  };
+}
+
+/** Gas Fee 固定扣减额（U = 结算货币单位，由商户承担时从实付中扣除） */
+var GAS_FEE = 1.2;
+
+/**
+ * 核心计算（先乘后除 + toFixed 归一化，避免浮点误差如 0.1+0.2）
+ * 上游有效汇率 = 汇率 + 上游单价调整；下游有效汇率 = 汇率 + 下游单价调整
+ * 实收 = 金额 × 上游有效汇率 × (1 − 上游费率%)
+ * 实付 = 金额 × 下游有效汇率 × (1 − 我方费率%)（商户承担 Gas Fee 时再减 1.2U）
+ * 毛利 = 实收 − 实付
+ */
+function compute(amount, rate, feeUp, feeDown, deductGas, adjUp, adjDown) {
+  adjUp = adjUp || 0;
+  adjDown = adjDown || 0;
+  var effUp = norm(rate + adjUp);                 // 上游有效汇率
+  var effDown = norm(rate + adjDown);             // 下游有效汇率
+  var recv = norm(norm(amount * effUp) * (1 - feeUp / 100)); // 实收
+  var pay = norm(norm(amount * effDown) * (1 - feeDown / 100)); // 实付
+  if (deductGas) pay = norm(pay - GAS_FEE);       // 商户承担 Gas Fee：实付再扣 1.2U
+  var gross = norm(recv - pay);                   // 毛利
+  return { recv: recv, pay: pay, gross: gross };
+}
+
+/** 用 toFixed(8) 再转回数字，截断浮点噪声（支持 8 位小数精度，如 1.16225213） */
+function norm(n) {
+  return Number(n.toFixed(8));
+}
+
+/* ============================================================
+   三、格式化工具
+   ============================================================ */
+
+/** 数值格式化（精度核心）：
+ *  无小数货币取整；其余最多 8 位小数（去掉多余尾零，至少保留 2 位）
+ *  千分位只分组整数部分（避免小数位被错误加逗号） */
+function fmtNum(value, noDecimal) {
+  var s;
+  if (noDecimal) {
+    s = value.toFixed(0);
+  } else {
+    s = value.toFixed(8).replace(/(\.\d\d\d*?)0+$/, '$1'); // 最多 8 位，去尾零，保底 2 位
+  }
+  var dot = s.indexOf('.');
+  var intPart = dot === -1 ? s : s.slice(0, dot);
+  var decPart = dot === -1 ? '' : s.slice(dot);
+  return intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ',') + decPart;
+}
+
+/** 千分位格式化：无小数货币取整，其余最多 8 位小数（如 USDT 1,421,000.00 / 116.225213） */
+function fmtMoney(value, currencyCode) {
+  var cur = findCurrency(currencyCode);
+  return cur.symbol + fmtNum(value, cur.noDecimal);
+}
+
+/** 千分位格式化原始金额（不带货币符号前缀，用于只读带出显示） */
+function fmtAmountPlain(value, currencyCode) {
+  var cur = findCurrency(currencyCode);
+  return fmtNum(value, cur.noDecimal);
+}
+
+/** 汇率显示（最多 8 位小数，去掉多余 0，如 1.16225213 / 1450） */
+function fmtRate(rate) {
+  var s = rate.toFixed(8).replace(/0+$/, '').replace(/\.$/, '');
+  return s;
+}
+
+/** 费后汇率显示（最多 10 位小数，去尾零——汇率×费率的乘积常超过 8 位有效小数，如 1.1488070874） */
+function fmtRateExt(rate) {
+  var s = rate.toFixed(10).replace(/0+$/, '').replace(/\.$/, '');
+  return s;
+}
+
+/** 日期时间格式化：YYYY-MM-DD HH:mm:ss */
+function fmtDateTime(ts) {
+  var d = new Date(ts);
+  var p = function (n) { return (n < 10 ? '0' : '') + n; };
+  return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' +
+         p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds());
+}
+
+/** 字段红框开关 */
+function toggleFieldError(fieldId, hasErr) {
+  var field = document.getElementById(fieldId);
+  var input = field.querySelector('.input-wrap');
+  if (hasErr) { field.classList.add('invalid'); input.classList.add('invalid'); }
+  else { field.classList.remove('invalid'); input.classList.remove('invalid'); }
+}
+
+/* ============================================================
+   四、计算器渲染（输入即算）
+   ============================================================ */
+
+function recalc() {
+  var v = validateInputs();
+  var curTo = state.currencyTo;
+
+  // 下游面板只读带出
+  document.getElementById('roAmountCur').textContent = state.currencyFrom;
+  document.getElementById('roAmount').value = v.ok || parseNum(document.getElementById('amount').value) > 0
+    ? fmtAmountPlain(v.amount, state.currencyFrom)
+    : (document.getElementById('amount').value || '');
+  document.getElementById('roRate').value = fmtRate(v.rate) || document.getElementById('rate').value;
+
+  var recvEl = document.getElementById('recvVal');
+  var payEl = document.getElementById('payVal');
+  var profitEl = document.getElementById('profitVal');
+  var notice = document.getElementById('invalidNotice');
+  var btnPost = document.getElementById('btnPost');
+
+  if (!v.ok) {
+    recvEl.textContent = '—';
+    payEl.textContent = '—';
+    profitEl.textContent = '—';
+    document.getElementById('effUpVal').textContent = '—';
+    document.getElementById('effUpSub').textContent = '';
+    document.getElementById('effDownVal').textContent = '—';
+    document.getElementById('effDownSub').textContent = '';
+    notice.style.display = 'block';
+    btnPost.disabled = true;
+    return;
+  }
+  notice.style.display = 'none';
+  btnPost.disabled = false;
+
+  var r = compute(v.amount, v.rate, v.feeUp, v.feeDown, document.getElementById('gasFee').checked, v.adjUp, v.adjDown);
+  recvEl.textContent = fmtMoney(r.recv, curTo);
+  payEl.textContent = fmtMoney(r.pay, curTo);
+  profitEl.textContent = fmtMoney(r.gross, curTo);
+
+  // 费后汇率（含单价调整与费率的折算汇率 = 每 1 原始货币实际结算的结算货币数量）
+  var effUpRate = (v.rate + v.adjUp) * (1 - v.feeUp / 100);
+  var effDownRate = (v.rate + v.adjDown) * (1 - v.feeDown / 100);
+  document.getElementById('effUpVal').textContent = fmtRateExt(effUpRate);
+  document.getElementById('effDownVal').textContent = fmtRateExt(effDownRate);
+  document.getElementById('effUpSub').textContent =
+    '(' + fmtRate(v.rate) + (v.adjUp ? ' ' + fmtSigned(v.adjUp) : '') + ') × (1 − ' + fmtRate(v.feeUp) + '%)' +
+    ' = ' + fmtRateExt(effUpRate) + ' ' + curTo;
+  document.getElementById('effDownSub').textContent =
+    '(' + fmtRate(v.rate) + (v.adjDown ? ' ' + fmtSigned(v.adjDown) : '') + ') × (1 − ' + fmtRate(v.feeDown) + '%)' +
+    ' = ' + fmtRateExt(effDownRate) + ' ' + curTo;
+  // 公式注释跟随单价调整 / Gas Fee 选项动态显示
+  document.getElementById('recvFormula').textContent =
+    '实收 = 金额 × ' + (v.adjUp ? '(汇率 ' + fmtSigned(v.adjUp) + ')' : '汇率') + ' × (1 − 上游费率)';
+  document.getElementById('payFormula').textContent =
+    '实付 = 金额 × ' + (v.adjDown ? '(汇率 ' + fmtSigned(v.adjDown) + ')' : '汇率') + ' × (1 − 我方费率)' +
+    (document.getElementById('gasFee').checked ? ' − 1.2（Gas Fee 由商户承担）' : '');
+  // 毛利为负时变红提示
+  profitEl.style.color = r.gross < 0 ? 'var(--red)' : 'var(--green)';
+  document.querySelector('#profitBar .pf').textContent =
+    '· ' + (r.gross >= 0 ? '正数为盈利' : '当前为负毛利（亏损）');
+}
+
+/** 货币切换（由搜索选择框回调触发） */
+function onCurrencyChange(code) {
+  state.currencyFrom = code;
+  refreshPrefixes();
+  recalc();
+}
+
+/** 结算货币切换（由搜索选择框回调触发） */
+function onSettleCurrencyChange(code) {
+  state.currencyTo = code;
+  saveToLS(LS_LAST_SETTLE, state.currencyTo); // 记住用户选择，下次进入时恢复
+  refreshPrefixes();
+  recalc();
+  renderLedger(); // 汇总卡片按结算货币展示
+}
+
+/** 汇率参考提示：每个货币自带对 USD 的大概值，按货币对估算参考汇率 */
+function approxRatePlaceholder(fromCode, toCode) {
+  var f = findCurrency(fromCode), tc = findCurrency(toCode);
+  if (!f.usd || !tc.usd) return t('ph.rateManual');
+  var r = f.usd / tc.usd; // 1 单位原始货币 ≈ r 单位结算货币
+  var s = r >= 100 ? r.toFixed(2) : (r >= 1 ? r.toFixed(4) : r.toFixed(6));
+  s = s.replace(/0+$/, '').replace(/\.$/, '');
+  return tf('ph.rateApprox', [s]);
+}
+
+/** 刷新界面上的货币前缀文字与汇率参考提示（保证输入无效时也跟随当前货币） */
+function refreshPrefixes() {
+  var pair = state.currencyFrom + '→' + state.currencyTo;
+  document.getElementById('ratePrefix').textContent = pair;
+  document.getElementById('roRatePrefix').textContent = pair;
+  document.getElementById('rate').placeholder = approxRatePlaceholder(state.currencyFrom, state.currencyTo);
+  document.getElementById('adjUpLabel').textContent =
+    '上游汇率单价调整（每 1 ' + state.currencyFrom + ' ± ' + state.currencyTo + '）';
+  document.getElementById('adjDownLabel').textContent =
+    '下游汇率单价调整（每 1 ' + state.currencyFrom + ' ± ' + state.currencyTo + '）';
+  document.getElementById('effUpLabel').textContent =
+    '上游费后汇率（每 1 ' + state.currencyFrom + ' 实得 ' + state.currencyTo + '）';
+  document.getElementById('effDownLabel').textContent =
+    '下游费后汇率（每 1 ' + state.currencyFrom + ' 支付 ' + state.currencyTo + '）';
+  document.querySelector('#profitBar .pf').textContent = '· 正数为盈利';
+}
+
+/** 带符号数字显示：+0.5 / −0.3 */
+function fmtSigned(n) {
+  if (!n) return '';
+  return (n > 0 ? '+' : '−') + Math.abs(n);
+}
+
+/* ============================================================
+   费后汇率点击复制
+   ============================================================ */
+
+/** 复制兜底方案（clipboard API 不可用时） */
+function fallbackCopyText(text) {
+  var ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.select();
+  try { document.execCommand('copy'); } catch (e) { /* 忽略 */ }
+  document.body.removeChild(ta);
+}
+
+/** 点击费后汇率框复制数值（纯数字，不含货币符号） */
+function copyEffRate(boxId, valId) {
+  var box = document.getElementById(boxId);
+  var text = document.getElementById(valId).textContent;
+  if (!text || text === '—') return;
+  var done = function () {
+    box.classList.add('copied');
+    var hint = box.querySelector('.copy-hint');
+    hint.textContent = t('btn.copied');
+    setTimeout(function () {
+      box.classList.remove('copied');
+      hint.textContent = t('hint.clickCopy');
+    }, 1200);
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(done, function () { fallbackCopyText(text); done(); });
+  } else {
+    fallbackCopyText(text);
+    done();
+  }
+}
+
+/** 点击实收/实付金额复制显示文本（含货币符号整串复制；显示为 — 时不可复制） */
+function copyValue(elId) {
+  var el = document.getElementById(elId);
+  var text = el.textContent;
+  if (!text || text === '—') return;
+  var done = function () {
+    el.classList.add('copied');
+    setTimeout(function () { el.classList.remove('copied'); }, 1200);
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(done, function () { fallbackCopyText(text); done(); });
+  } else {
+    fallbackCopyText(text);
+    done();
+  }
+}
+
+/* ============================================================
+   备注常用选项（自定义 + 快速选择）
+   ============================================================ */
+
+/** 展开 / 收起常用备注菜单 */
+function toggleRemarkMenu(ev) {
+  ev.stopPropagation();
+  var menu = document.getElementById('remarkMenu');
+  renderRemarkMenu();
+  menu.classList.toggle('open');
+}
+
+/** 关闭常用备注菜单 */
+function closeRemarkMenu() {
+  document.getElementById('remarkMenu').classList.remove('open');
+}
+
+/** 渲染常用备注菜单列表 */
+function renderRemarkMenu() {
+  var menu = document.getElementById('remarkMenu');
+  var list = state.remarkPresets || [];
+  var html = '';
+  if (!list.length) {
+    html += '<div class="rm-empty">' + escapeHtml(t('rm.empty')) + '</div>';
+  }
+  for (var i = 0; i < list.length; i++) {
+    html += '<div class="rm-item" onclick="applyRemarkPreset(' + i + ')">' +
+      '<span class="rm-text">' + escapeHtml(list[i]) + '</span>' +
+      '<button class="rm-del" title="' + escapeHtml(t('title.rmDel')) + '" onclick="removeRemarkPreset(event, ' + i + ')">×</button>' +
+      '</div>';
+  }
+  html += '<button class="rm-add" id="rmAddBtn" onclick="addRemarkPreset()">' + escapeHtml(t('rm.save')) + '</button>';
+  menu.innerHTML = html;
+}
+
+/** 选中某个常用备注 → 填入输入框 */
+function applyRemarkPreset(i) {
+  document.getElementById('remark').value = state.remarkPresets[i] || '';
+  closeRemarkMenu();
+  document.getElementById('remark').focus();
+}
+
+/** 将当前输入框内容保存为常用备注（去重，最新的排前面） */
+function addRemarkPreset() {
+  var v = (document.getElementById('remark').value || '').trim();
+  if (!v) {
+    var btn = document.getElementById('rmAddBtn');
+    if (btn) {
+      btn.textContent = t('rm.needInput');
+      setTimeout(function () { btn.textContent = t('rm.save'); }, 1500);
+    }
+    return;
+  }
+  if (state.remarkPresets.indexOf(v) === -1) {
+    state.remarkPresets.unshift(v);
+    saveToLS(LS_REMARKS, state.remarkPresets);
+  }
+  renderRemarkMenu();
+}
+
+/** 删除某个常用备注 */
+function removeRemarkPreset(ev, i) {
+  ev.stopPropagation();
+  state.remarkPresets.splice(i, 1);
+  saveToLS(LS_REMARKS, state.remarkPresets);
+  renderRemarkMenu();
+}
+
+/** 点击备注菜单外部时自动收起 */
+document.addEventListener('click', function (e) {
+  if (!e.target || !e.target.closest || !e.target.closest('.remark-wrap')) closeRemarkMenu();
+});
+
+/* ============================================================
+   结算规则预设（把费率方案存为命名规则，一键套用，v7）
+   ============================================================ */
+
+/** 规则字段安全解析为数字（存的是原始字符串，空/非法按 0 处理，仅用于摘要显示） */
+function ruleNum(str) {
+  var n = parseNumOptional(String(str == null ? '' : str));
+  return (n === null || isNaN(n)) ? 0 : n;
+}
+
+/** 规则摘要文字：如 上2%+0.01 / 下5%−0.02 */
+function ruleSummary(rule) {
+  var adjUp = ruleNum(rule.adjUp);
+  var adjDown = ruleNum(rule.adjDown);
+  return tf('ruleSummary', [ruleNum(rule.feeUp), adjUp ? fmtSigned(adjUp) : '',
+    ruleNum(rule.feeDown), adjDown ? fmtSigned(adjDown) : '']);
+}
+
+/** 展开 / 收起套用规则菜单 */
+function toggleRuleMenu(ev) {
+  ev.stopPropagation();
+  var menu = document.getElementById('ruleMenu');
+  renderRuleMenu();
+  menu.classList.toggle('open');
+}
+
+/** 关闭套用规则菜单 */
+function closeRuleMenu() {
+  document.getElementById('ruleMenu').classList.remove('open');
+}
+
+/** 渲染套用规则菜单列表（名字 + 费率摘要，每项可删除） */
+function renderRuleMenu() {
+  var menu = document.getElementById('ruleMenu');
+  var list = state.rulePresets || [];
+  var html = '';
+  if (!list.length) {
+    html += '<div class="rm-empty">' + escapeHtml(t('ruleMenu.empty')) + '</div>';
+  }
+  for (var i = 0; i < list.length; i++) {
+    html += '<div class="rm-item" onclick="applyRulePreset(' + i + ')">' +
+      '<span class="rm-text">' + escapeHtml(list[i].name) + '（' + escapeHtml(ruleSummary(list[i])) + '）</span>' +
+      '<button class="rm-del" title="' + escapeHtml(t('title.ruleDel')) + '" onclick="removeRulePreset(event, ' + i + ')">×</button>' +
+      '</div>';
+  }
+  menu.innerHTML = html;
+}
+
+/** 把当前四个费率/调整输入框存为命名规则（原始字符串，保留留空语义；重名覆盖更新） */
+function saveRulePreset() {
+  var nameEl = document.getElementById('ruleName');
+  var btn = document.getElementById('ruleSaveBtn');
+  var name = (nameEl.value || '').trim();
+  if (!name) {
+    btn.textContent = t('msg.needRuleNameBtn');
+    setTimeout(function () { btn.textContent = t('btn.saveRule'); }, 1500);
+    nameEl.focus();
+    return;
+  }
+  var rule = {
+    name: name,
+    feeUp: document.getElementById('feeUp').value,
+    adjUp: document.getElementById('adjUp').value,
+    feeDown: document.getElementById('feeDown').value,
+    adjDown: document.getElementById('adjDown').value
+  };
+  var replaced = false;
+  for (var i = 0; i < state.rulePresets.length; i++) {
+    if (state.rulePresets[i].name === name) {
+      state.rulePresets[i] = rule; // 重名覆盖更新
+      replaced = true;
+      break;
+    }
+  }
+  if (!replaced) state.rulePresets.push(rule);
+  saveToLS(LS_RULES, state.rulePresets);
+  renderRuleMenu(); // 菜单若正打开则即时刷新
+  btn.textContent = t('msg.ruleSaved');
+  setTimeout(function () { btn.textContent = t('btn.saveRule'); }, 1500);
+}
+
+/** 套用某条规则：把四个值填回输入框（空串照填，保留留空语义）并重算 */
+function applyRulePreset(i) {
+  var rule = state.rulePresets[i];
+  if (!rule) return;
+  document.getElementById('feeUp').value = rule.feeUp || '';
+  document.getElementById('adjUp').value = rule.adjUp || '';
+  document.getElementById('feeDown').value = rule.feeDown || '';
+  document.getElementById('adjDown').value = rule.adjDown || '';
+  closeRuleMenu();
+  recalc();
+}
+
+/** 删除某条规则 */
+function removeRulePreset(ev, i) {
+  ev.stopPropagation();
+  state.rulePresets.splice(i, 1);
+  saveToLS(LS_RULES, state.rulePresets);
+  renderRuleMenu();
+}
+
+/** 点击规则菜单外部时自动收起（与备注菜单的监听相互独立、可共存） */
+document.addEventListener('click', function (e) {
+  if (!e.target || !e.target.closest || !e.target.closest('.rule-wrap')) closeRuleMenu();
+});
+
+/** 重置计算器（保留货币选择） */
+function resetCalculator() {
+  document.getElementById('amount').value = '';
+  document.getElementById('rate').value = '';
+  document.getElementById('feeUp').value = '';
+  document.getElementById('feeDown').value = '';
+  document.getElementById('adjUp').value = '';
+  document.getElementById('adjDown').value = '';
+  document.getElementById('remark').value = '';
+  recalc();
+}
+
+/* ============================================================
+   五、记账系统
+   ============================================================ */
+
+/** 一键入账 */
+function postToLedger() {
+  var v = validateInputs();
+  if (!v.ok) return;
+  var gas = document.getElementById('gasFee').checked;
+  var r = compute(v.amount, v.rate, v.feeUp, v.feeDown, gas, v.adjUp, v.adjDown);
+  var entry = {
+    id: Date.now() + '' + Math.floor(Math.random() * 1000), // 唯一 ID
+    time: Date.now(),
+    type: '代收',
+    currencyFrom: state.currencyFrom,
+    currencyTo: state.currencyTo,
+    amount: v.amount,
+    rate: v.rate,
+    feeUp: v.feeUp,
+    feeDown: v.feeDown,
+    adjUp: v.adjUp,        // 上游汇率单价调整（±，0 = 无）
+    adjDown: v.adjDown,    // 下游汇率单价调整（±，0 = 无）
+    gasFee: gas,          // 商户是否承担 Gas Fee（实付已扣 1.2U）
+    recv: r.recv,
+    pay: r.pay,
+    gross: r.gross,
+    remark: (document.getElementById('remark').value || '').trim()
+  };
+  state.ledger.push(entry);
+  saveToLS(LS_LEDGER, state.ledger);
+  renderLedger();
+  // 入账成功提示（用确认弹窗轻量提示）
+  showConfirm('入账成功', '该笔订单已写入账本（共 ' + state.ledger.length + ' 笔）。', null, true);
+}
+
+/** 按当前筛选条件过滤账目 */
+function getFilteredLedger() {
+  var kw = (document.getElementById('filterKeyword').value || '').trim().toLowerCase();
+  var from = document.getElementById('filterFrom').value;
+  var to = document.getElementById('filterTo').value;
+  var fromTs = from ? new Date(from + 'T00:00:00').getTime() : -Infinity;
+  var toTs = to ? new Date(to + 'T23:59:59.999').getTime() : Infinity;
+
+  return state.ledger.filter(function (e) {
+    if (e.time < fromTs || e.time > toTs) return false;
+    if (kw && (e.remark || '').toLowerCase().indexOf(kw) === -1) return false;
+    return true;
+  });
+}
+
+/** 多币种合计：按结算货币分组求和（互不混算），返回如 "USDT 1,139.01 · KRW 1,421,000" */
+function fmtMulti(list, field) {
+  var sums = {}, order = [];
+  for (var i = 0; i < list.length; i++) {
+    var k = list[i].currencyTo || '?';
+    if (!sums[k]) { sums[k] = 0; order.push(k); }
+    sums[k] = norm(sums[k] + list[i][field]);
+  }
+  if (!order.length) return '—';
+  var parts = [];
+  for (var j = 0; j < order.length; j++) parts.push(fmtMoney(sums[order[j]], order[j]));
+  return parts.join(' · ');
+}
+
+/** 渲染账本表格 + 总计行 + 汇总卡片（全部联动筛选） */
+function renderLedger() {
+  var list = getFilteredLedger().slice().sort(function (a, b) { return b.time - a.time; });
+  var tbody = document.getElementById('ledgerBody');
+  var emptyTip = document.getElementById('emptyTip');
+  var html = '';
+
+  for (var i = 0; i < list.length; i++) {
+    var e = list[i];
+    var grossCls = e.gross >= 0 ? 'gross-pos' : 'gross-neg';
+    html += '<tr>' +
+      '<td class="num-cell">' + fmtDateTime(e.time) + '</td>' +
+      '<td><span class="tag" style="font-size:11px;color:var(--primary);background:var(--primary-weak);border-radius:10px;padding:2px 8px;">' + escapeHtml(e.type) + '</span></td>' +
+      '<td class="num-cell">' + fmtMoney(e.amount, e.currencyFrom) + '</td>' +
+      '<td class="num-cell">' + escapeHtml(e.currencyFrom) + '→' + escapeHtml(e.currencyTo) + ' ' + fmtRate(e.rate) + '</td>' +
+      '<td class="num-cell">' + e.feeUp + '%' + (e.adjUp ? '<span class="gas-tag">' + fmtSigned(e.adjUp) + '</span>' : '') + '</td>' +
+      '<td class="num-cell">' + e.feeDown + '%' + (e.adjDown ? '<span class="gas-tag">' + fmtSigned(e.adjDown) + '</span>' : '') + '</td>' +
+      '<td class="num-cell">' + fmtMoney(e.recv, e.currencyTo) + '</td>' +
+      '<td class="num-cell">' + fmtMoney(e.pay, e.currencyTo) + (e.gasFee ? '<span class="gas-tag">含Gas</span>' : '') + '</td>' +
+      '<td class="num-cell ' + grossCls + '">' + fmtMoney(e.gross, e.currencyTo) + '</td>' +
+      '<td>' + escapeHtml(e.remark || '—') + '</td>' +
+      '<td><button class="ticket-btn" title="查看该笔全单工单" onclick="showLedgerTicket(\'' + e.id + '\')">工单</button>' +
+      '<button class="del-btn" onclick="confirmDeleteEntry(\'' + e.id + '\')">删除</button></td>' +
+      '</tr>';
+  }
+  tbody.innerHTML = html;
+  emptyTip.style.display = list.length === 0 ? 'block' : 'none';
+  document.getElementById('ledgerCountTag').textContent = list.length + ' 笔（共 ' + state.ledger.length + ' 笔）';
+
+  // 总计行（跟随当前筛选，按结算货币分组）
+  document.getElementById('ledgerFoot').innerHTML = list.length ? (
+    '<tr>' +
+    '<td colspan="6" style="text-align:right;">总计（当前筛选 ' + list.length + ' 笔）</td>' +
+    '<td class="num-cell">' + fmtMulti(list, 'recv') + '</td>' +
+    '<td class="num-cell">' + fmtMulti(list, 'pay') + '</td>' +
+    '<td class="num-cell">' + fmtMulti(list, 'gross') + '</td>' +
+    '<td colspan="2"></td>' +
+    '</tr>'
+  ) : '';
+
+  // 汇总统计卡片（跟随当前筛选，按结算货币分组，互不混算）
+  document.getElementById('statCount').textContent = list.length;
+  document.getElementById('statRecv').textContent = list.length ? fmtMulti(list, 'recv') : '—';
+  document.getElementById('statPay').textContent = list.length ? fmtMulti(list, 'pay') : '—';
+  document.getElementById('statGross').textContent = list.length ? fmtMulti(list, 'gross') : '—';
+}
+
+/** 清除筛选条件 */
+function clearFilters() {
+  document.getElementById('filterKeyword').value = '';
+  document.getElementById('filterFrom').value = '';
+  document.getElementById('filterTo').value = '';
+  renderLedger();
+}
+
+/** HTML 转义（防备注内容注入） */
+function escapeHtml(s) {
+  return String(s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+/** 删除单条（二次确认） */
+function confirmDeleteEntry(id) {
+  showConfirm(t('msg.delTitle'), t('msg.delMsg'), function () {
+    state.ledger = state.ledger.filter(function (e) { return e.id !== id; });
+    saveToLS(LS_LEDGER, state.ledger);
+    renderLedger();
+  });
+}
+
+/** 清空账本（二次确认） */
+function confirmClearAll() {
+  if (state.ledger.length === 0) { showConfirm(t('msg.tip'), t('msg.ledgerEmpty'), null, true); return; }
+  showConfirm(t('msg.clearTitle'), tf('msg.clearMsg', [state.ledger.length]), function () {
+    state.ledger = [];
+    saveToLS(LS_LEDGER, state.ledger);
+    renderLedger();
+  });
+}
+
+/** CSV 数值字段：按货币小数位（KRW/JPY 取整，USDT 等最多 8 位小数）+ 千分位，逗号需引号包裹 */
+function csvNum(value, currencyCode) {
+  return '"' + fmtAmountPlain(value, currencyCode) + '"';
+}
+
+/** 导出 CSV（UTF-8 BOM，Excel 中文不乱码；跟随当前筛选） */
+function exportCSV() {
+  var list = getFilteredLedger().slice().sort(function (a, b) { return b.time - a.time; });
+  if (list.length === 0) { showConfirm('提示', '当前筛选条件下没有可导出的账目。', null, true); return; }
+
+  var header = ['入账时间', '订单类型', '金额货币', '金额', '结算货币', '汇率', '上游费率%', '上游单价调整', '我方费率%', '下游单价调整', '商户承担Gas', '实收', '实付', '毛利', '备注'];
+  var rows = [header.join(',')];
+  for (var i = 0; i < list.length; i++) {
+    var e = list[i];
+    rows.push([
+      fmtDateTime(e.time), e.type, e.currencyFrom, csvNum(e.amount, e.currencyFrom), e.currencyTo,
+      fmtRate(e.rate), e.feeUp, (e.adjUp ? fmtSigned(e.adjUp) : '0'), e.feeDown, (e.adjDown ? fmtSigned(e.adjDown) : '0'),
+      (e.gasFee ? '是(1.2U)' : '否'),
+      csvNum(e.recv, e.currencyTo), csvNum(e.pay, e.currencyTo), csvNum(e.gross, e.currencyTo),
+      '"' + (e.remark || '').replace(/"/g, '""') + '"'
+    ].join(','));
+  }
+  var csv = '\uFEFF' + rows.join('\r\n');
+  var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = 'Novolink账本_' + new Date().toISOString().slice(0, 10) + '.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+/* ============================================================
+   六、货币系统（下拉 + 自定义货币）
+   ============================================================ */
+
+/** 构建可搜索货币选择框（货币种类多，支持按代码/名称搜索）
+ *  mountId: 挂载容器 id；current: 当前货币代码；onPick: 选中回调 */
+function makeCurrencyPicker(mountId, current, onPick) {
+  var mount = document.getElementById(mountId);
+  if (!mount) return null;
+  mount.classList.add('cur-picker');
+  mount.innerHTML =
+    '<button type="button" class="cur-btn"></button>' +
+    '<div class="cur-drop">' +
+      '<input type="text" class="cur-search" placeholder="' + escapeHtml(t('cur.searchPh')) + '">' +
+      '<div class="cur-list"></div>' +
+    '</div>';
+  var btn = mount.querySelector('.cur-btn');
+  var drop = mount.querySelector('.cur-drop');
+  var search = mount.querySelector('.cur-search');
+  var listEl = mount.querySelector('.cur-list');
+
+  function renderList(kw) {
+    var all = getAllCurrencies();
+    kw = (kw || '').trim().toLowerCase();
+    var html = '';
+    for (var i = 0; i < all.length; i++) {
+      var c = all[i];
+      var hitCode = c.code.toLowerCase().indexOf(kw) > -1;
+      var hitName = kw && (c.name || '').toLowerCase().indexOf(kw) > -1;
+      if (kw && !hitCode && !hitName) continue;
+      html += '<div class="cur-item' + (c.code === current ? ' sel' : '') + '" data-code="' + escapeHtml(c.code) + '">' +
+        '<span>' + escapeHtml(c.code) + (c.custom ? t('cur.custom') : '') + '</span>' +
+        '<span class="ci-name">' + escapeHtml(c.name || '') + '</span>' +
+        '</div>';
+    }
+    listEl.innerHTML = html || '<div class="cur-empty">' + escapeHtml(t('cur.noMatch')) + '</div>';
+  }
+  function open() {
+    search.value = '';
+    renderList('');
+    drop.classList.add('open');
+    search.focus();
+  }
+  function close() { drop.classList.remove('open'); }
+  function pick(code) {
+    if (!code) return;
+    current = code;
+    btn.textContent = code;
+    close();
+    onPick(code);
+  }
+
+  btn.addEventListener('click', function (e) {
+    e.stopPropagation();
+    if (drop.classList.contains('open')) close(); else open();
+  });
+  search.addEventListener('input', function () { renderList(search.value); });
+  search.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      var first = listEl.querySelector('.cur-item');
+      if (first) pick(first.getAttribute('data-code'));
+    } else if (e.key === 'Escape') {
+      close();
+    }
+  });
+  listEl.addEventListener('click', function (e) {
+    var item = e.target.closest ? e.target.closest('.cur-item') : null;
+    if (item) pick(item.getAttribute('data-code'));
+  });
+  // 点击组件外部关闭
+  document.addEventListener('click', function (e) {
+    if (!mount.contains(e.target)) close();
+  });
+
+  btn.textContent = current;
+  return {
+    setCurrent: function (code) { current = code; btn.textContent = code; }
+  };
+}
+
+/** 构建/重建两个货币搜索选择框（原始货币 + 结算货币） */
+var pickerFrom = null, pickerTo = null;
+function buildCurrencyPickers() {
+  pickerFrom = makeCurrencyPicker('curFromPicker', state.currencyFrom, onCurrencyChange);
+  pickerTo = makeCurrencyPicker('curToPicker', state.currencyTo, onSettleCurrencyChange);
+}
+
+/** 打开自定义货币弹窗 */
+function openCurrencyModal() {
+  document.getElementById('newCurCode').value = '';
+  document.getElementById('newCurName').value = '';
+  document.getElementById('newCurNoDecimal').checked = false;
+  document.getElementById('curErr').style.display = 'none';
+  document.getElementById('currencyModal').classList.add('show');
+}
+
+function closeCurrencyModal() {
+  document.getElementById('currencyModal').classList.remove('show');
+}
+
+/** 添加自定义货币（校验：3-4位字母、不与已有重复） */
+function addCurrency() {
+  var code = (document.getElementById('newCurCode').value || '').trim().toUpperCase();
+  var name = (document.getElementById('newCurName').value || '').trim();
+  var noDecimal = document.getElementById('newCurNoDecimal').checked;
+  var errEl = document.getElementById('curErr');
+
+  var showErr = function (msg) { errEl.textContent = msg; errEl.style.display = 'block'; };
+  if (!/^[A-Z]{2,4}$/.test(code)) return showErr(t('cur.errCode'));
+  if (!name) return showErr(t('cur.errName'));
+  var all = getAllCurrencies();
+  for (var i = 0; i < all.length; i++) {
+    if (all[i].code === code) return showErr(tf('cur.errDup', [code]));
+  }
+  state.customCurrencies.push({ code: code, name: name, symbol: code, noDecimal: noDecimal, custom: true });
+  saveToLS(LS_CUSTOM_CUR, state.customCurrencies);
+  buildCurrencyPickers();
+  closeCurrencyModal();
+  showConfirm(t('cur.added'), tf('cur.addedMsg', [code, name]), null, true);
+}
+
+/* ============================================================
+   七、通用确认弹窗
+   ============================================================ */
+
+/** 显示确认弹窗；onOk 为空则仅提示（确认按钮显示"知道了"） */
+var _confirmCallback = null;
+function showConfirm(title, msg, onOk, infoOnly) {
+  document.getElementById('confirmTitle').textContent = title;
+  document.getElementById('confirmMsg').textContent = msg;
+  var btn = document.getElementById('confirmOkBtn');
+  if (infoOnly) {
+    btn.textContent = t('btn.ok');
+    btn.className = 'btn btn-primary';
+    _confirmCallback = null;
+  } else {
+    btn.textContent = t('btn.confirm');
+    btn.className = 'btn btn-danger';
+    _confirmCallback = onOk;
+  }
+  document.getElementById('confirmModal').classList.add('show');
+}
+
+function hideConfirm() {
+  document.getElementById('confirmModal').classList.remove('show');
+}
+
+/** 点击确认按钮：执行回调并关闭 */
+document.getElementById('confirmOkBtn').addEventListener('click', function () {
+  var cb = _confirmCallback;
+  _confirmCallback = null;
+  hideConfirm();
+  if (typeof cb === 'function') cb();
+});
+
+/** 点击遮罩关闭弹窗 */
+document.getElementById('confirmModal').addEventListener('click', function (e) {
+  if (e.target === this) hideConfirm();
+});
+document.getElementById('currencyModal').addEventListener('click', function (e) {
+  if (e.target === this) closeCurrencyModal();
+});
+
+/* ============================================================
+   七·五、结算工单（Telegram 制式纯文本，关键数据反引号包裹，v7）
+   ============================================================ */
+
+/** 工单时间格式：YYYY-MM-DD HH:mm（不含秒） */
+function fmtTicketTime(ts) {
+  var d = new Date(ts);
+  var p = function (n) { return (n < 10 ? '0' : '') + n; };
+  return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' +
+         p(d.getHours()) + ':' + p(d.getMinutes());
+}
+
+/** 工单金额：千分位数字 + 货币代码（如 1,148.8070874 USDT） */
+function fmtTicketAmount(value, currencyCode) {
+  return fmtAmountPlain(value, currencyCode) + ' ' + currencyCode;
+}
+
+/** 工单单价调整显示：无调整时统一显示 0 */
+function ticketAdj(n) {
+  return n ? fmtSigned(n) : '0';
+}
+
+/** 工单分隔线 */
+var TICKET_SEP = '────────────';
+
+/** 生成上游工单文本（要求当前输入全部合法，否则返回空串） */
+function buildUpstreamTicket() {
+  var v = validateInputs();
+  if (!v.ok) return '';
+  var r = compute(v.amount, v.rate, v.feeUp, v.feeDown, false, v.adjUp, v.adjDown);
+  var effUpRate = (v.rate + v.adjUp) * (1 - v.feeUp / 100);
+  return '📋 上游结算工单\n' + TICKET_SEP + '\n' +
+    '时间：' + fmtTicketTime(Date.now()) + '\n' +
+    '货币对：' + state.currencyFrom + ' → ' + state.currencyTo + '\n' +
+    '原始金额：`' + fmtTicketAmount(v.amount, state.currencyFrom) + '`\n' +
+    '原汇率：`' + fmtRate(v.rate) + '`\n' +
+    '上游费率：`' + v.feeUp + '%`\n' +
+    '单价调整：`' + ticketAdj(v.adjUp) + '`\n' +
+    '费后汇率：`' + fmtRateExt(effUpRate) + '`\n' +
+    TICKET_SEP + '\n' +
+    '✅ 实际打款（我方实收）：`' + fmtTicketAmount(r.recv, state.currencyTo) + '`';
+}
+
+/** 生成下游工单文本（要求当前输入全部合法；勾选 Gas 时追加扣费说明行） */
+function buildDownstreamTicket() {
+  var v = validateInputs();
+  if (!v.ok) return '';
+  var gas = document.getElementById('gasFee').checked;
+  var r = compute(v.amount, v.rate, v.feeUp, v.feeDown, gas, v.adjUp, v.adjDown);
+  var effDownRate = (v.rate + v.adjDown) * (1 - v.feeDown / 100);
+  var text = '📋 下游结算工单\n' + TICKET_SEP + '\n' +
+    '时间：' + fmtTicketTime(Date.now()) + '\n' +
+    '货币对：' + state.currencyFrom + ' → ' + state.currencyTo + '\n' +
+    '原始金额：`' + fmtTicketAmount(v.amount, state.currencyFrom) + '`\n' +
+    '原汇率：`' + fmtRate(v.rate) + '`\n' +
+    '我方费率：`' + v.feeDown + '%`\n' +
+    '单价调整：`' + ticketAdj(v.adjDown) + '`\n' +
+    '费后汇率：`' + fmtRateExt(effDownRate) + '`\n' +
+    TICKET_SEP + '\n' +
+    '✅ 实际打款（付给下游）：`' + fmtTicketAmount(r.pay, state.currencyTo) + '`';
+  if (gas) {
+    text += '\n（Gas Fee 由商户承担，实付已扣 `' + GAS_FEE + ' ' + state.currencyTo + '`）';
+  }
+  return text;
+}
+
+/** 生成入账记录全单工单文本（从 entry 字段重建，费后汇率现算） */
+function buildLedgerTicket(e) {
+  if (!e) return '';
+  var adjUp = e.adjUp || 0, adjDown = e.adjDown || 0;
+  var effUpRate = (e.rate + adjUp) * (1 - e.feeUp / 100);
+  var effDownRate = (e.rate + adjDown) * (1 - e.feeDown / 100);
+  var text = '📋 结算工单 · 全单信息\n' + TICKET_SEP + '\n' +
+    '时间：' + fmtTicketTime(e.time) + '\n' +
+    '备注：' + (e.remark ? e.remark : '—') + '\n' +
+    '类型：' + e.type + '\n' +
+    '货币对：' + e.currencyFrom + ' → ' + e.currencyTo + '\n' +
+    '原始金额：`' + fmtTicketAmount(e.amount, e.currencyFrom) + '`\n' +
+    TICKET_SEP + '\n' +
+    '⬆ 上游结算\n' +
+    '原汇率：`' + fmtRate(e.rate) + '`  费率：`' + e.feeUp + '%`  单价：`' + ticketAdj(adjUp) + '`\n' +
+    '费后汇率：`' + fmtRateExt(effUpRate) + '`\n' +
+    '实收（上游打款给我们）：`' + fmtTicketAmount(e.recv, e.currencyTo) + '`\n' +
+    TICKET_SEP + '\n' +
+    '⬇ 下游结算\n' +
+    '费率：`' + e.feeDown + '%`  单价：`' + ticketAdj(adjDown) + '`\n' +
+    '费后汇率：`' + fmtRateExt(effDownRate) + '`\n' +
+    '实付（我们打给下游）：`' + fmtTicketAmount(e.pay, e.currencyTo) + '`';
+  if (e.gasFee) {
+    text += '\n（Gas Fee 由商户承担，实付已扣 `' + GAS_FEE + ' ' + e.currencyTo + '`）';
+  }
+  text += '\n' + TICKET_SEP + '\n' +
+    '💰 本单毛利：`' + fmtTicketAmount(e.gross, e.currencyTo) + '`';
+  return text;
+}
+
+/** 打开上游工单弹窗（输入无效时提示先修正） */
+function showUpstreamTicket() {
+  var v = validateInputs();
+  if (!v.ok) { showConfirm('提示', '请先修正输入。', null, true); return; }
+  showTicket('上游结算工单', buildUpstreamTicket());
+}
+
+/** 打开下游工单弹窗（输入无效时提示先修正） */
+function showDownstreamTicket() {
+  var v = validateInputs();
+  if (!v.ok) { showConfirm('提示', '请先修正输入。', null, true); return; }
+  showTicket('下游结算工单', buildDownstreamTicket());
+}
+
+/** 打开某笔入账的全单工单弹窗 */
+function showLedgerTicket(id) {
+  var entry = null;
+  for (var i = 0; i < state.ledger.length; i++) {
+    if (state.ledger[i].id === id) { entry = state.ledger[i]; break; }
+  }
+  if (!entry) return;
+  showTicket('结算工单 · 全单信息', buildLedgerTicket(entry));
+}
+
+/** 工单弹窗：展示全文 + 整段复制（全文缓存于 _ticketText） */
+var _ticketText = '';
+function showTicket(title, text) {
+  _ticketText = text || '';
+  document.getElementById('ticketTitle').textContent = title;
+  document.getElementById('ticketText').textContent = _ticketText;
+  document.getElementById('ticketCopyBtn').textContent = t('btn.copyTicket');
+  document.getElementById('ticketModal').classList.add('show');
+}
+
+function hideTicket() {
+  document.getElementById('ticketModal').classList.remove('show');
+}
+
+/** 复制工单全文（clipboard API + execCommand 降级） */
+function copyTicketText() {
+  var btn = document.getElementById('ticketCopyBtn');
+  var done = function () {
+    btn.textContent = t('btn.copied');
+    setTimeout(function () { btn.textContent = t('btn.copyTicket'); }, 1500);
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(_ticketText).then(done, function () { fallbackCopyText(_ticketText); done(); });
+  } else {
+    fallbackCopyText(_ticketText);
+    done();
+  }
+}
+
+/** 点击遮罩关闭工单弹窗 */
+document.getElementById('ticketModal').addEventListener('click', function (e) {
+  if (e.target === this) hideTicket();
+});
+
+/* ============================================================
+   v8 覆盖层：动态金额 / 多规则草稿 / 抬头批次 / 三反引号工单 /
+   账目关联 / 规则与账目导入导出
+   （同名函数声明覆盖上方旧实现——同一 script 内后声明者生效）
+   ============================================================ */
+
+/* ---------- 字段红框开关（容错：字段内无 .input-wrap 时不报错） ---------- */
+function toggleFieldError(fieldId, hasErr) {
+  var field = document.getElementById(fieldId);
+  if (!field) return;
+  var input = field.querySelector('.input-wrap');
+  if (hasErr) { field.classList.add('invalid'); if (input) input.classList.add('invalid'); }
+  else { field.classList.remove('invalid'); if (input) input.classList.remove('invalid'); }
+}
+
+/* ---------- 动态金额输入（末位输正数自动追加；0 / 空不新增；中间清空移除） ---------- */
+function makeAmountRowHtml(idx) {
+  return '<span class="amount-no">' + (idx + 1) + '.</span>' +
+    '<input type="text" class="amount-input num" inputmode="decimal" placeholder="' + escapeHtml(tf('ph.amountRow', [idx + 1])) + '" value="' + escapeHtml(state.currentAmounts[idx]) + '" ' +
+    'oninput="onAmountInput(' + idx + ', this.value)" onblur="onAmountBlur(' + idx + ', this.value)">';
+}
+
+function renderAmountList() {
+  if (!state.currentAmounts) state.currentAmounts = [''];
+  var wrap = document.getElementById('amountList');
+  var html = '';
+  for (var i = 0; i < state.currentAmounts.length; i++) {
+    html += '<div class="amount-item">' + makeAmountRowHtml(i) + '</div>';
+  }
+  wrap.innerHTML = html;
+}
+
+/* 只追加一行 DOM（不整表重渲染，避免输入过程中焦点丢失） */
+function appendAmountRow() {
+  state.currentAmounts.push('');
+  var wrap = document.getElementById('amountList');
+  var div = document.createElement('div');
+  div.className = 'amount-item';
+  div.innerHTML = makeAmountRowHtml(state.currentAmounts.length - 1);
+  wrap.appendChild(div);
+}
+
+function onAmountInput(idx, value) {
+  state.currentAmounts[idx] = value;
+  var n = parseNum(value);
+  if (idx === state.currentAmounts.length - 1 && n !== null && n > 0) appendAmountRow();
+  recalc();
+}
+
+function onAmountBlur(idx, value) {
+  var n = parseNum(value);
+  if ((n === null || n <= 0) && state.currentAmounts.length > 1) {
+    state.currentAmounts.splice(idx, 1);
+    renderAmountList();
+  }
+  recalc();
+}
+
+/* 有效金额数组（过滤空行 / 0 / 负数） */
+function getCurrentAmounts() {
+  var out = [];
+  if (!state.currentAmounts) return out;
+  for (var i = 0; i < state.currentAmounts.length; i++) {
+    var n = parseNum(state.currentAmounts[i]);
+    if (n !== null && n > 0) out.push(n);
+  }
+  return out;
+}
+
+/* ---------- 输入校验（多金额版；v10：勾选「套用前项汇率」且汇率留空时继承草稿前值，不报红） ---------- */
+function validateInputs() {
+  var amounts = getCurrentAmounts();
+  var rate = parseNum(document.getElementById('rate').value);
+  var feeUp = parseNumOptional(document.getElementById('feeUp').value);
+  var feeDown = parseNumOptional(document.getElementById('feeDown').value);
+  var adjUp = parseNumOptional(document.getElementById('adjUp').value);
+  var adjDown = parseNumOptional(document.getElementById('adjDown').value);
+
+  // v10：勾选「套用前项汇率」且当前汇率留空 → 继承草稿中上一条规则的汇率参与计算
+  if ((rate === null || rate <= 0) && document.getElementById('usePrevRate').checked &&
+      state.ticketDraft && state.ticketDraft.length) {
+    var prevRate = state.ticketDraft[state.ticketDraft.length - 1].rate;
+    if (prevRate > 0) rate = prevRate;
+  }
+  var okAmount = amounts.length > 0;
+  var okRate = rate !== null && rate > 0;
+  var okFeeUp = feeUp !== null && feeUp >= 0 && feeUp <= 100;
+  var okFeeDown = feeDown !== null && feeDown >= 0 && feeDown <= 100;
+  var okAdjUp = adjUp !== null && (!okRate || rate + adjUp > 0);
+  var okAdjDown = adjDown !== null && (!okRate || rate + adjDown > 0);
+
+  toggleFieldError('f-amounts', !okAmount);
+  toggleFieldError('f-rate', !okRate);
+  toggleFieldError('f-feeUp', !okFeeUp);
+  toggleFieldError('f-feeDown', !okFeeDown);
+  toggleFieldError('f-adjUp', !okAdjUp);
+  toggleFieldError('f-adjDown', !okAdjDown);
+
+  return {
+    ok: okAmount && okRate && okFeeUp && okFeeDown && okAdjUp && okAdjDown,
+    amounts: amounts,
+    rate: okRate ? rate : 0,
+    feeUp: okFeeUp ? (feeUp || 0) : 0,
+    feeDown: okFeeDown ? (feeDown || 0) : 0,
+    adjUp: (okAdjUp && adjUp) ? adjUp : 0,
+    adjDown: (okAdjDown && adjDown) ? adjDown : 0
+  };
+}
+
+/* ---------- 按规则批量计算：每笔一行 + 小计（Gas 按笔扣减，与账目口径一致） ---------- */
+function computeRuleTotals(amounts, rate, feeUp, feeDown, gas, adjUp, adjDown) {
+  var lines = [], sumRecv = 0, sumPay = 0;
+  for (var i = 0; i < amounts.length; i++) {
+    var r = compute(amounts[i], rate, feeUp, feeDown, gas, adjUp, adjDown);
+    lines.push({ amount: amounts[i], recv: r.recv, pay: r.pay, gross: r.gross });
+    sumRecv = norm(sumRecv + r.recv);
+    sumPay = norm(sumPay + r.pay);
+  }
+  return { lines: lines, recv: sumRecv, pay: sumPay, gross: norm(sumRecv - sumPay) };
+}
+
+/* ---------- 计算器重算（小计模式） ---------- */
+function recalc() {
+  var v = validateInputs();
+  var curTo = state.currencyTo;
+  var recvEl = document.getElementById('recvVal');
+  var payEl = document.getElementById('payVal');
+  var profitEl = document.getElementById('profitVal');
+  var notice = document.getElementById('invalidNotice');
+  var btnPost = document.getElementById('btnPost');
+
+  var hasDrafts = state.ticketDraft && state.ticketDraft.length;
+
+  if (!v.ok && !hasDrafts) {
+    recvEl.textContent = '—';
+    payEl.textContent = '—';
+    profitEl.textContent = '—';
+    document.getElementById('effUpVal').textContent = '—';
+    document.getElementById('effUpSub').textContent = '';
+    document.getElementById('effDownVal').textContent = '—';
+    document.getElementById('effDownSub').textContent = '';
+    notice.style.display = 'block';
+    btnPost.disabled = true;
+    return;
+  }
+  // v10：有草稿时当前输入可以不完整，仍能一键入账全部草稿
+  notice.style.display = 'none';
+  btnPost.disabled = false;
+  if (!v.ok) return; // 草稿存在但当前输入非法：允许入账，仅跳过当前实时计算
+
+  var gas = document.getElementById('gasFee').checked;
+  var tot = computeRuleTotals(v.amounts, v.rate, v.feeUp, v.feeDown, gas, v.adjUp, v.adjDown);
+  recvEl.textContent = fmtMoney(tot.recv, curTo);
+  payEl.textContent = fmtMoney(tot.pay, curTo);
+  profitEl.textContent = fmtMoney(tot.gross, curTo);
+
+  var effUpRate = (v.rate + v.adjUp) * (1 - v.feeUp / 100);
+  var effDownRate = (v.rate + v.adjDown) * (1 - v.feeDown / 100);
+  document.getElementById('effUpVal').textContent = fmtRateExt(effUpRate);
+  document.getElementById('effDownVal').textContent = fmtRateExt(effDownRate);
+  document.getElementById('effUpSub').textContent =
+    '(' + fmtRate(v.rate) + (v.adjUp ? ' ' + fmtSigned(v.adjUp) : '') + ') × (1 − ' + fmtRate(v.feeUp) + '%) = ' + fmtRateExt(effUpRate) + ' ' + curTo;
+  document.getElementById('effDownSub').textContent =
+    '(' + fmtRate(v.rate) + (v.adjDown ? ' ' + fmtSigned(v.adjDown) : '') + ') × (1 − ' + fmtRate(v.feeDown) + '%) = ' + fmtRateExt(effDownRate) + ' ' + curTo;
+  document.getElementById('recvFormula').textContent =
+    tf('formula.recv', [v.adjUp ? tf('formula.adjRate', [fmtSigned(v.adjUp)]) : t('formula.rateWord')]);
+  document.getElementById('payFormula').textContent =
+    tf('formula.pay', [v.adjDown ? tf('formula.adjRate', [fmtSigned(v.adjDown)]) : t('formula.rateWord'), gas ? t('formula.gasSuffix') : '']);
+  profitEl.style.color = tot.gross < 0 ? 'var(--red)' : 'var(--green)';
+  var pf = document.querySelector('#profitBar .pf');
+  if (pf) pf.textContent = '· ' + (tot.gross >= 0 ? t('pf.pos') : t('pf.neg'));
+}
+
+/* ---------- 货币前缀刷新（v8：无 roRatePrefix，改为汇率标签内联货币对） ---------- */
+function refreshPrefixes() {
+  var lbl = document.querySelector('#f-rate label');
+  if (lbl) lbl.textContent = tf('label.ratePair', [state.currencyFrom, state.currencyTo]);
+  document.getElementById('rate').placeholder = approxRatePlaceholder(state.currencyFrom, state.currencyTo);
+  document.getElementById('adjUpLabel').textContent =
+    tf('label.adjUp', [state.currencyFrom, state.currencyTo]);
+  document.getElementById('adjDownLabel').textContent =
+    tf('label.adjDown', [state.currencyFrom, state.currencyTo]);
+  document.getElementById('effUpLabel').textContent =
+    tf('label.effUp', [state.currencyFrom, state.currencyTo]);
+  document.getElementById('effDownLabel').textContent =
+    tf('label.effDown', [state.currencyFrom, state.currencyTo]);
+  var pf = document.querySelector('#profitBar .pf');
+  if (pf) pf.textContent = '· ' + t('pf.pos');
+}
+
+/* ---------- 套用规则（v8：同时填入规则名） ---------- */
+function applyRulePreset(i) {
+  var rule = state.rulePresets[i];
+  if (!rule) return;
+  document.getElementById('feeUp').value = rule.feeUp || '';
+  document.getElementById('adjUp').value = rule.adjUp || '';
+  document.getElementById('feeDown').value = rule.feeDown || '';
+  document.getElementById('adjDown').value = rule.adjDown || '';
+  document.getElementById('ruleName').value = rule.name || '';
+  closeRuleMenu();
+  recalc();
+}
+
+/* ---------- 工单草稿（多规则并行；v10：带下游商户） ---------- */
+
+/** 勾选「套用前项汇率」时：当前汇率留空则自动取草稿上一条规则的汇率 */
+function onUsePrevRate() {
+  var cb = document.getElementById('usePrevRate');
+  if (cb.checked && state.ticketDraft && state.ticketDraft.length) {
+    var rateEl = document.getElementById('rate');
+    if (!(rateEl.value || '').trim()) {
+      rateEl.value = String(state.ticketDraft[state.ticketDraft.length - 1].rate);
+      recalc();
+    }
+  }
+}
+
+function addRuleToDraft() {
+  // v10：勾选「套用前项汇率」且汇率留空 → 自动带入上一条规则的汇率，无需手工再打
+  if (document.getElementById('usePrevRate').checked && state.ticketDraft && state.ticketDraft.length) {
+    var rateEl = document.getElementById('rate');
+    if (!(rateEl.value || '').trim()) {
+      rateEl.value = String(state.ticketDraft[state.ticketDraft.length - 1].rate);
+    }
+  }
+  var v = validateInputs();
+  if (!v.ok) { showConfirm(t('msg.tip'), t('msg.fixInputsDraft'), null, true); return; }
+  var nameEl = document.getElementById('ruleName');
+  var name = (nameEl.value || '').trim();
+  if (!name) {
+    showConfirm(t('msg.needRuleName'), t('msg.needRuleNameMsg'), null, true);
+    nameEl.focus();
+    return;
+  }
+  var merchant = (document.getElementById('merchant').value || '').trim();
+  var gas = document.getElementById('gasFee').checked;
+  var tt = computeRuleTotals(v.amounts, v.rate, v.feeUp, v.feeDown, gas, v.adjUp, v.adjDown);
+  var keepRate = document.getElementById('usePrevRate').checked;
+  var prevRateStr = document.getElementById('rate').value;
+  state.ticketDraft.push({
+    name: name,
+    merchant: merchant,
+    rate: v.rate,
+    feeUp: v.feeUp, adjUp: v.adjUp,
+    feeDown: v.feeDown, adjDown: v.adjDown,
+    gas: gas,
+    amounts: v.amounts.slice(),
+    lines: tt.lines, recv: tt.recv, pay: tt.pay, gross: tt.gross,
+    curFrom: state.currencyFrom, curTo: state.currencyTo
+  });
+  // 重置当前规则输入（保留抬头/批次/商户；勾选「套用前项汇率」时保留汇率，且勾选状态保持到下一条）
+  document.getElementById('feeUp').value = '';
+  document.getElementById('adjUp').value = '';
+  document.getElementById('feeDown').value = '';
+  document.getElementById('adjDown').value = '';
+  nameEl.value = '';
+  document.getElementById('gasFee').checked = false;
+  state.currentAmounts = [''];
+  renderAmountList();
+  document.getElementById('rate').value = keepRate ? prevRateStr : '';
+  renderDraft();
+  recalc();
+  nameEl.focus();
+}
+
+function removeDraftRule(i) {
+  state.ticketDraft.splice(i, 1);
+  renderDraft();
+}
+
+function clearDraft() {
+  if (!state.ticketDraft.length) return;
+  showConfirm(t('msg.clearDraftTitle'), tf('msg.clearDraftMsg', [state.ticketDraft.length]), function () {
+    state.ticketDraft = [];
+    renderDraft();
+  });
+}
+
+function renderDraft() {
+  if (!state.ticketDraft) state.ticketDraft = [];
+  var list = state.ticketDraft;
+  var wrap = document.getElementById('draftList');
+  var count = document.getElementById('draftCount');
+  count.textContent = tf('draft.count', [list.length]);
+  if (!list.length) {
+    wrap.innerHTML = '<div class="empty-tip" style="padding:8px 0;">' + escapeHtml(t('draft.empty')) + '</div>';
+    return;
+  }
+  var html = '';
+  for (var i = 0; i < list.length; i++) {
+    var d = list[i];
+    html += '<div class="draft-item">' +
+      '<div class="draft-head"><span class="draft-name">' + (i + 1) + '. ' + escapeHtml(d.name) + '</span>' +
+      '<span class="draft-meta">' + (d.merchant ? escapeHtml(d.merchant) + ' · ' : '') + tf('draft.metaEntries', [d.amounts.length]) + ' · ' + tf('draft.metaRate', [fmtRate(d.rate)]) + ' · ' + escapeHtml(ruleSummary(d)) + (d.gas ? ' · ' + t('draft.gasMark') : '') + '</span>' +
+      '<button class="del-btn" onclick="removeDraftRule(' + i + ')">' + escapeHtml(t('draft.remove')) + '</button></div>' +
+      '<div class="draft-totals">' + t('draft.subRecv') + ' <b class="num">' + fmtTicketAmount(d.recv, d.curTo || state.currencyTo) + '</b> · ' + t('draft.subPay') + ' <b class="num">' + fmtTicketAmount(d.pay, d.curTo || state.currencyTo) + '</b> · ' + t('draft.gross') + ' <b class="num">' + fmtTicketAmount(d.gross, d.curTo || state.currencyTo) + '</b></div>' +
+      '</div>';
+  }
+  wrap.innerHTML = html;
+}
+
+/* 当前输入打包成规则对象（无草稿时工单/入账使用） */
+function getCurrentRuleObj() {
+  var v = validateInputs();
+  if (!v.ok) return null;
+  var gas = document.getElementById('gasFee').checked;
+  var tt = computeRuleTotals(v.amounts, v.rate, v.feeUp, v.feeDown, gas, v.adjUp, v.adjDown);
+  return {
+    name: (document.getElementById('ruleName').value || '').trim() || t('rule.current'),
+    merchant: (document.getElementById('merchant').value || '').trim(),
+    rate: v.rate,
+    feeUp: v.feeUp, adjUp: v.adjUp,
+    feeDown: v.feeDown, adjDown: v.adjDown,
+    gas: gas,
+    amounts: v.amounts.slice(),
+    lines: tt.lines, recv: tt.recv, pay: tt.pay, gross: tt.gross,
+    curFrom: state.currencyFrom, curTo: state.currencyTo
+  };
+}
+
+/* 工单/入账使用的规则集：草稿优先，无草稿用当前输入 */
+function getTicketRules() {
+  if (state.ticketDraft && state.ticketDraft.length) return state.ticketDraft;
+  var cur = getCurrentRuleObj();
+  return cur ? [cur] : null;
+}
+
+/* ---------- 工单生成（v10：每个数字单独反引号包裹，TG 中点按即可复制单个数字；
+     上游工单不含商户与我方抬头；下游工单按商户分组；汇总工单含商户小计，供自己看） ---------- */
+
+/** 单个数值反引号包裹（货币符号/百分号留在反引号外，复制出来是纯数字） */
+function tkN(s) { return '`' + s + '`'; }
+function tkNum(v) { var n = Number(v); return isNaN(n) ? 0 : n; } // 容错：旧数据字段可能是字符串
+function tkAmt(value, currencyCode) { return tkN(fmtAmountPlain(tkNum(value), currencyCode)) + ' ' + currencyCode; }
+function tkRate(n) { return tkN(fmtRate(tkNum(n))); }
+function tkRateExt(n) { return tkN(fmtRateExt(tkNum(n))); }
+function tkFee(n) { return tkN(fmtRate(tkNum(n))) + '%'; }
+/** 单价调整用 ASCII + / −（U+2212 会导致复制后无法解析，v10 修正） */
+function tkAdj(n) { n = tkNum(n); return tkN(n ? ((n > 0 ? '+' : '-') + Math.abs(n)) : '0'); }
+
+function buildDirectionTicket(kind) {
+  var rules = getTicketRules();
+  if (!rules) { showConfirm(t('msg.tip'), t('msg.fixInputsTicket'), null, true); return ''; }
+  var isUp = kind === 'up';
+  var isAll = kind === 'all';
+  var title = isUp ? t('ticket.t.up') : (isAll ? t('ticket.t.all') : t('ticket.t.down'));
+  var header = (document.getElementById('header').value || '').trim();
+  var batch = (document.getElementById('batch').value || '').trim();
+  var L = [];
+  L.push('📋 ' + title);
+  L.push(TICKET_SEP);
+  L.push(t('ticket.time') + fmtTicketTime(Date.now()));
+  L.push(t('ticket.pair') + state.currencyFrom + ' → ' + state.currencyTo);
+  if (isAll) {  // 汇总工单供自己看：带我方抬头/批次
+    if (header) L.push(t('ticket.header') + header);
+    if (batch) L.push(t('ticket.batch') + batch);
+  }
+  var totRecv = 0, totPay = 0, totLines = 0;
+
+  if (isUp) {
+    // 上游工单：纯业务数据（规则/汇率/费率/明细/小计/总计），不含商户名与我方抬头
+    for (var ui = 0; ui < rules.length; ui++) {
+      var ud = rules[ui];
+      var uFrom = ud.curFrom || state.currencyFrom, uTo = ud.curTo || state.currencyTo;
+      L.push(TICKET_SEP);
+      L.push('▎' + (ui + 1) + '. ' + ud.name + (ud.gas ? t('ticket.gas') : ''));
+      L.push(tf('ticket.rateLine', [tkRate(ud.rate), uFrom, uTo]));
+      L.push(tf('ticket.upLine', [tkFee(ud.feeUp), tkAdj(ud.adjUp), tkRateExt((ud.rate + ud.adjUp) * (1 - ud.feeUp / 100)), uTo]));
+      for (var uj = 0; uj < ud.lines.length; uj++) {
+        var ul = ud.lines[uj];
+        L.push(tf('ticket.lineRecv', [(uj + 1), tkAmt(ul.amount, uFrom), tkAmt(ul.recv, uTo)]));
+      }
+      L.push(tf('ticket.subRecv', [tkAmt(ud.recv, uTo), tkN(ud.lines.length)]));
+      totRecv = norm(totRecv + ud.recv);
+      totPay = norm(totPay + ud.pay);
+      totLines += ud.lines.length;
+    }
+    L.push(TICKET_SEP);
+    L.push(tf('ticket.totalRecv', [tkAmt(totRecv, state.currencyTo), tkN(rules.length), tkN(totLines)]));
+  } else {
+    // 下游 / 汇总：按「下游商户」分组，每个商户独立成段（互不冲突）
+    var groups = [], groupIdx = {};
+    for (var gi = 0; gi < rules.length; gi++) {
+      var mk = rules[gi].merchant || '';
+      if (groupIdx[mk] === undefined) { groupIdx[mk] = groups.length; groups.push({ merchant: mk, rules: [] }); }
+      groups[groupIdx[mk]].rules.push(rules[gi]);
+    }
+    var ruleNo = 0;
+    for (var g = 0; g < groups.length; g++) {
+      var grp = groups[g];
+      L.push(TICKET_SEP + TICKET_SEP);
+      L.push('🏢 ' + t('ticket.merchant') + (grp.merchant || t('ticket.noMerchant')));
+      var gRecv = 0, gPay = 0, gLines = 0;
+      for (var ri = 0; ri < grp.rules.length; ri++) {
+        var d = grp.rules[ri];
+        ruleNo++;
+        var curFrom = d.curFrom || state.currencyFrom, curTo = d.curTo || state.currencyTo;
+        L.push('▎' + ruleNo + '. ' + d.name + (d.gas ? t('ticket.gas') : ''));
+        L.push(tf('ticket.rateLine', [tkRate(d.rate), curFrom, curTo]));
+        if (isAll) {
+          L.push(tf('ticket.upLine', [tkFee(d.feeUp), tkAdj(d.adjUp), tkRateExt((d.rate + d.adjUp) * (1 - d.feeUp / 100)), curTo]));
+        }
+        L.push(tf('ticket.downLine', [tkFee(d.feeDown), tkAdj(d.adjDown), tkRateExt((d.rate + d.adjDown) * (1 - d.feeDown / 100)), curTo]));
+        for (var j = 0; j < d.lines.length; j++) {
+          var ln = d.lines[j];
+          if (isAll) {
+            L.push(tf('ticket.lineBoth', [(j + 1), tkAmt(ln.amount, curFrom), tkAmt(ln.recv, curTo), tkAmt(ln.pay, curTo)]));
+          } else {
+            L.push(tf('ticket.linePay', [(j + 1), tkAmt(ln.amount, curFrom), tkAmt(ln.pay, curTo)]));
+          }
+        }
+        if (isAll) {
+          L.push(tf('ticket.subAll', [tkAmt(d.recv, curTo), tkAmt(d.pay, curTo), tkAmt(d.gross, curTo), tkN(d.lines.length)]));
+        } else {
+          L.push(tf('ticket.subPay', [tkAmt(d.pay, curTo), tkN(d.lines.length)]));
+        }
+        gRecv = norm(gRecv + d.recv);
+        gPay = norm(gPay + d.pay);
+        gLines += d.lines.length;
+      }
+      L.push(t('ticket.mSubHead'));
+      if (isAll) {
+        L.push(tf('ticket.mSubAll', [tkAmt(gRecv, state.currencyTo), tkAmt(gPay, state.currencyTo), tkAmt(norm(gRecv - gPay), state.currencyTo), tkN(grp.rules.length), tkN(gLines)]));
+      } else {
+        L.push(tf('ticket.mSubPay', [tkAmt(gPay, state.currencyTo), tkN(grp.rules.length), tkN(gLines)]));
+      }
+      totRecv = norm(totRecv + gRecv);
+      totPay = norm(totPay + gPay);
+      totLines += gLines;
+    }
+    L.push(TICKET_SEP);
+    if (isAll) {
+      L.push(tf('ticket.totalAll', [tkAmt(totRecv, state.currencyTo), tkAmt(totPay, state.currencyTo), tkAmt(norm(totRecv - totPay), state.currencyTo), tkN(rules.length), tkN(totLines), tkN(groups.length)]));
+    } else {
+      L.push(tf('ticket.totalPay', [tkAmt(totPay, state.currencyTo), tkN(rules.length), tkN(totLines), tkN(groups.length)]));
+    }
+  }
+  return L.join('\n');
+}
+
+function buildUpstreamTicket() { return buildDirectionTicket('up'); }
+function buildDownstreamTicket() { return buildDirectionTicket('down'); }
+function buildCombinedTicket() { return buildDirectionTicket('all'); }
+
+function showUpstreamTicket() { var tk = buildDirectionTicket('up'); if (tk) showTicket(t('ticket.t.up'), tk); }
+function showDownstreamTicket() { var tk = buildDirectionTicket('down'); if (tk) showTicket(t('ticket.t.down'), tk); }
+function showCombinedTicket() { var tk = buildDirectionTicket('all'); if (tk) showTicket(t('ticket.t.allModal'), tk); }
+
+/* ---------- 入账记录全单工单（v10：按 ticketId 关联整单重建；数字逐个反引号；含商户/我方抬头） ---------- */
+function buildLedgerTicket(e) {
+  if (!e) return '';
+  var group = e.ticketId ? state.ledger.filter(function (x) { return x.ticketId === e.ticketId; }) : [e];
+  group.sort(function (a, b) {
+    return ((a.ruleIndex || 0) - (b.ruleIndex || 0)) || ((a.lineIndex || 0) - (b.lineIndex || 0));
+  });
+  var L = [];
+  L.push('📋 ' + t('ticket.t.ledger'));
+  L.push(TICKET_SEP);
+  L.push(t('ticket.time') + fmtTicketTime(group.length ? group[0].time : e.time));
+  L.push(t('ticket.pair') + e.currencyFrom + ' → ' + e.currencyTo);
+  if (e.header) L.push(t('ticket.header') + e.header);
+  if (e.batch) L.push(t('ticket.batch') + e.batch);
+  var totRecv = 0, totPay = 0, totCnt = 0, ruleCnt = 0, lastName = null;
+  for (var i = 0; i < group.length; i++) {
+    var g = group[i];
+    var gRate = tkNum(g.rate), gFeeUp = tkNum(g.feeUp), gFeeDown = tkNum(g.feeDown);
+    var gAdjUp = tkNum(g.adjUp), gAdjDown = tkNum(g.adjDown); // 旧账目可能无调整值，容错为 0
+    if (g.ruleName !== lastName) {
+      L.push(TICKET_SEP);
+      L.push('▎' + (g.ruleName || t('ticket.noName')) + (g.merchant ? tf('ticket.merchantParen', [g.merchant]) : ''));
+      ruleCnt++;
+      lastName = g.ruleName;
+      L.push(tf('ticket.rateLine', [tkRate(gRate), g.currencyFrom, g.currencyTo]));
+      L.push(tf('ticket.upLine', [tkFee(gFeeUp), tkAdj(gAdjUp), tkRateExt((gRate + gAdjUp) * (1 - gFeeUp / 100)), g.currencyTo]));
+      L.push(tf('ticket.downLine', [tkFee(gFeeDown), tkAdj(gAdjDown), tkRateExt((gRate + gAdjDown) * (1 - gFeeDown / 100)), g.currencyTo]));
+    }
+    L.push(tf('ticket.lineBoth', [((g.lineIndex || 0) + 1), tkAmt(g.amount, g.currencyFrom), tkAmt(g.recv, g.currencyTo), tkAmt(g.pay, g.currencyTo)]) + (g.gasFee ? t('ticket.inclGas') : ''));
+    totRecv = norm(totRecv + g.recv);
+    totPay = norm(totPay + g.pay);
+    totCnt++;
+  }
+  L.push(TICKET_SEP);
+  L.push(tf('ticket.totalAllNoM', [tkAmt(totRecv, e.currencyTo), tkAmt(totPay, e.currencyTo), tkAmt(norm(totRecv - totPay), e.currencyTo), tkN(ruleCnt), tkN(totCnt)]));
+  L.push(TICKET_SEP);
+  L.push(t('ticket.remark') + (e.remark ? e.remark : '—'));
+  return L.join('\n');
+}
+
+function showLedgerTicket(id) {
+  var entry = null;
+  for (var i = 0; i < state.ledger.length; i++) {
+    if (state.ledger[i].id === id) { entry = state.ledger[i]; break; }
+  }
+  if (!entry) return;
+  showTicket(t('ticket.t.ledger'), buildLedgerTicket(entry));
+}
+
+/* ---------- 入账（v10：每规则 × 每金额一条账目；商户随规则记账；我方抬头/批次选填） ---------- */
+function postToLedger() {
+  var rules;
+  if (state.ticketDraft && state.ticketDraft.length) {
+    rules = state.ticketDraft;
+  } else {
+    var cur = getCurrentRuleObj();
+    if (!cur) { showConfirm(t('msg.tip'), t('msg.fixInputs'), null, true); return; }
+    rules = [cur];
+  }
+  // v10：入账前逐条校验草稿规则的 汇率/费率/金额（不合法则阻止整单入账）
+  for (var c = 0; c < rules.length; c++) {
+    var rd = rules[c];
+    if (!(rd.rate > 0) || !(rd.feeUp >= 0 && rd.feeUp <= 100) ||
+        !(rd.feeDown >= 0 && rd.feeDown <= 100) || !rd.amounts || !rd.amounts.length) {
+      showConfirm(t('msg.validateFail'), tf('msg.validateFailMsg', [(c + 1), rd.name || t('ticket.noName')]), null, true);
+      return;
+    }
+  }
+  var header = (document.getElementById('header').value || '').trim();
+  var batch = (document.getElementById('batch').value || '').trim();
+  var remark = (document.getElementById('remark').value || '').trim();
+  var ticketId = 'T' + Date.now() + '' + Math.floor(Math.random() * 900 + 100);
+  var count = 0;
+  var added = [];
+  for (var i = 0; i < rules.length; i++) {
+    var d = rules[i];
+    for (var j = 0; j < d.amounts.length; j++) {
+      var r = compute(d.amounts[j], d.rate, d.feeUp, d.feeDown, d.gas, d.adjUp, d.adjDown);
+      state.ledger.push({
+        id: Date.now() + '' + Math.floor(Math.random() * 1000) + '' + i + '' + j,
+        time: Date.now(),
+        type: '代收',
+        header: header,
+        merchant: d.merchant || '',
+        batch: batch,
+        ruleName: d.name,
+        ruleIndex: i,
+        lineIndex: j,
+        ticketId: ticketId,
+        currencyFrom: d.curFrom || state.currencyFrom,
+        currencyTo: d.curTo || state.currencyTo,
+        amount: d.amounts[j],
+        rate: d.rate,
+        feeUp: d.feeUp,
+        feeDown: d.feeDown,
+        adjUp: d.adjUp,
+        adjDown: d.adjDown,
+        gasFee: d.gas,
+        recv: r.recv,
+        pay: r.pay,
+        gross: r.gross,
+        remark: remark
+      });
+      added.push(state.ledger[state.ledger.length - 1]);
+      count++;
+    }
+  }
+  saveToLS(LS_LEDGER, state.ledger);
+  renderLedger();
+  // 入账后清理：清空草稿与规则输入，保留我方抬头（批次一并清空，避免误用旧批次）
+  state.ticketDraft = [];
+  renderDraft();
+  resetCalculator();
+  document.getElementById('batch').value = '';
+  showConfirm(t('msg.postedTitle'),
+    tf('msg.postedMsg', [rules.length, count, fmtMulti(added, 'recv'), fmtMulti(added, 'pay'), ticketId]),
+    null, true);
+}
+
+/* ---------- 账本筛选（关键词同时匹配 备注/抬头/批次/规则/工单号） ---------- */
+function getFilteredLedger() {
+  var kw = (document.getElementById('filterKeyword').value || '').trim().toLowerCase();
+  var from = document.getElementById('filterFrom').value;
+  var to = document.getElementById('filterTo').value;
+  var fromTs = from ? new Date(from + 'T00:00:00').getTime() : -Infinity;
+  var toTs = to ? new Date(to + 'T23:59:59.999').getTime() : Infinity;
+  return state.ledger.filter(function (e) {
+    if (e.time < fromTs || e.time > toTs) return false;
+    if (kw) {
+      var hay = ((e.remark || '') + ' ' + (e.header || '') + ' ' + (e.merchant || '') + ' ' + (e.batch || '') + ' ' +
+                 (e.ruleName || '') + ' ' + (e.ticketId || '')).toLowerCase();
+      if (hay.indexOf(kw) === -1) return false;
+    }
+    return true;
+  });
+}
+
+/* ---------- 账本渲染（v10：新增 商户 列） ---------- */
+function renderLedger() {
+  var list = getFilteredLedger().slice().sort(function (a, b) { return b.time - a.time; });
+  var tbody = document.getElementById('ledgerBody');
+  var emptyTip = document.getElementById('emptyTip');
+  var html = '';
+
+  for (var i = 0; i < list.length; i++) {
+    var e = list[i];
+    var grossCls = e.gross >= 0 ? 'gross-pos' : 'gross-neg';
+    html += '<tr>' +
+      '<td class="num-cell">' + fmtDateTime(e.time) + '</td>' +
+      '<td>' + escapeHtml(t('ledger.typeColl')) + '</td>' +
+      '<td>' + escapeHtml(e.header || '—') + '</td>' +
+      '<td>' + escapeHtml(e.merchant || '—') + '</td>' +
+      '<td>' + escapeHtml(e.batch || '—') + '</td>' +
+      '<td>' + escapeHtml(e.ruleName || '—') + '</td>' +
+      '<td class="num-cell">' + fmtMoney(e.amount, e.currencyFrom) + '</td>' +
+      '<td class="num-cell">' + escapeHtml(e.currencyFrom) + '→' + escapeHtml(e.currencyTo) + ' ' + fmtRate(e.rate) + '</td>' +
+      '<td class="num-cell">' + e.feeUp + '%' + (e.adjUp ? '<span class="gas-tag">' + fmtSigned(e.adjUp) + '</span>' : '') + '</td>' +
+      '<td class="num-cell">' + e.feeDown + '%' + (e.adjDown ? '<span class="gas-tag">' + fmtSigned(e.adjDown) + '</span>' : '') + '</td>' +
+      '<td class="num-cell">' + fmtMoney(e.recv, e.currencyTo) + '</td>' +
+      '<td class="num-cell">' + fmtMoney(e.pay, e.currencyTo) + (e.gasFee ? '<span class="gas-tag">' + escapeHtml(t('ledger.gasTag')) + '</span>' : '') + '</td>' +
+      '<td class="num-cell ' + grossCls + '">' + fmtMoney(e.gross, e.currencyTo) + '</td>' +
+      '<td>' + escapeHtml(e.remark || '—') + '</td>' +
+      '<td><button class="ticket-btn" title="' + escapeHtml(t('title.ledgerTicket')) + '" onclick="showLedgerTicket(\'' + e.id + '\')">' + escapeHtml(t('ledger.ticketBtn')) + '</button>' +
+      '<button class="del-btn" onclick="confirmDeleteEntry(\'' + e.id + '\')">' + escapeHtml(t('ledger.delBtn')) + '</button></td>' +
+      '</tr>';
+  }
+  tbody.innerHTML = html;
+  emptyTip.style.display = list.length === 0 ? 'block' : 'none';
+  document.getElementById('ledgerCountTag').textContent = tf('ledger.countTag', [list.length, state.ledger.length]);
+
+  // 总计行（跟随当前筛选，按结算货币分组）
+  document.getElementById('ledgerFoot').innerHTML = list.length ? (
+    '<tr>' +
+    '<td colspan="10" style="text-align:right;">' + escapeHtml(tf('ledger.totalRow', [list.length])) + '</td>' +
+    '<td class="num-cell">' + fmtMulti(list, 'recv') + '</td>' +
+    '<td class="num-cell">' + fmtMulti(list, 'pay') + '</td>' +
+    '<td class="num-cell">' + fmtMulti(list, 'gross') + '</td>' +
+    '<td colspan="2"></td>' +
+    '</tr>'
+  ) : '';
+
+  document.getElementById('statCount').textContent = list.length;
+  document.getElementById('statRecv').textContent = list.length ? fmtMulti(list, 'recv') : '—';
+  document.getElementById('statPay').textContent = list.length ? fmtMulti(list, 'pay') : '—';
+  document.getElementById('statGross').textContent = list.length ? fmtMulti(list, 'gross') : '—';
+}
+
+/* ---------- 重置（清空规则输入与金额；保留抬头/批次/货币选择；清空商户） ---------- */
+function resetCalculator() {
+  document.getElementById('rate').value = '';
+  document.getElementById('feeUp').value = '';
+  document.getElementById('feeDown').value = '';
+  document.getElementById('adjUp').value = '';
+  document.getElementById('adjDown').value = '';
+  document.getElementById('ruleName').value = '';
+  document.getElementById('merchant').value = '';
+  document.getElementById('remark').value = '';
+  document.getElementById('gasFee').checked = false;
+  document.getElementById('usePrevRate').checked = false;
+  state.currentAmounts = [''];
+  renderAmountList();
+  recalc();
+}
+
+/* ---------- 文件下载 / 导入导出 ---------- */
+function downloadFile(content, filename, mime) {
+  var blob = new Blob([content], { type: mime || 'application/octet-stream' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+/* 导出 CSV（v10：新增 商户 列；文件名去品牌） */
+function exportCSV() {
+  var list = getFilteredLedger().slice().sort(function (a, b) { return b.time - a.time; });
+  if (list.length === 0) { showConfirm(t('msg.tip'), t('msg.csvEmpty'), null, true); return; }
+  var header = t('csv.header').split(',');
+  var rows = [header.join(',')];
+  for (var i = 0; i < list.length; i++) {
+    var e = list[i];
+    rows.push([
+      fmtDateTime(e.time), t('ledger.typeColl'),
+      '"' + (e.header || '').replace(/"/g, '""') + '"',
+      '"' + (e.merchant || '').replace(/"/g, '""') + '"',
+      '"' + (e.batch || '').replace(/"/g, '""') + '"',
+      '"' + (e.ruleName || '').replace(/"/g, '""') + '"',
+      e.currencyFrom, csvNum(e.amount, e.currencyFrom), e.currencyTo,
+      fmtRate(e.rate), e.feeUp, (e.adjUp ? fmtSigned(e.adjUp) : '0'), e.feeDown, (e.adjDown ? fmtSigned(e.adjDown) : '0'),
+      (e.gasFee ? t('csv.gasYes') : t('csv.gasNo')),
+      csvNum(e.recv, e.currencyTo), csvNum(e.pay, e.currencyTo), csvNum(e.gross, e.currencyTo),
+      '"' + (e.ticketId || '') + '"',
+      '"' + (e.remark || '').replace(/"/g, '""') + '"'
+    ].join(','));
+  }
+  downloadFile('\uFEFF' + rows.join('\r\n'), t('fn.csv') + '_' + new Date().toISOString().slice(0, 10) + '.csv', 'text/csv;charset=utf-8;');
+}
+
+/* 导出规则（独立 JSON，与账目无关） */
+function exportRules() {
+  var list = state.rulePresets || [];
+  if (!list.length) { showConfirm(t('msg.tip'), t('msg.rulesEmpty'), null, true); return; }
+  var data = { app: 'fee-calculator', type: 'rules', version: 1, exportedAt: new Date().toISOString(), rules: list };
+  downloadFile(JSON.stringify(data, null, 2), t('fn.rules') + '_' + new Date().toISOString().slice(0, 10) + '.json', 'application/json');
+}
+
+/* 导出账目（JSON 备份，可再导入） */
+function exportLedgerJSON() {
+  if (!state.ledger.length) { showConfirm(t('msg.tip'), t('msg.ledgerNoExport'), null, true); return; }
+  var data = { app: 'fee-calculator', type: 'ledger', version: 1, exportedAt: new Date().toISOString(), entries: state.ledger };
+  downloadFile(JSON.stringify(data, null, 2), t('fn.ledgerJson') + '_' + new Date().toISOString().slice(0, 10) + '.json', 'application/json');
+}
+
+/* 导入入口（识别规则 / 账目 JSON） */
+function handleImport(input) {
+  if (!input.files || !input.files.length) return;
+  var file = input.files[0];
+  var reader = new FileReader();
+  reader.onload = function () {
+    var data;
+    try { data = JSON.parse(reader.result); }
+    catch (err) { showConfirm(t('msg.importFail'), t('msg.notJson'), null, true); return; }
+    if (data && data.type === 'rules' && Array.isArray(data.rules)) {
+      importRules(data.rules);
+    } else if (data && data.type === 'ledger' && Array.isArray(data.entries)) {
+      importLedger(data.entries);
+    } else if (Array.isArray(data) && data.length && data[0] && data[0].name !== undefined && data[0].recv === undefined) {
+      importRules(data); // 兼容旧版纯规则数组
+    } else {
+      showConfirm(t('msg.importFail'), t('msg.unknownFormat'), null, true);
+    }
+  };
+  reader.readAsText(file);
+  input.value = '';
+}
+
+/* 导入规则（按名称去重：同名覆盖更新，其余追加） */
+function importRules(rules) {
+  var added = 0, updated = 0;
+  for (var i = 0; i < rules.length; i++) {
+    var r = rules[i];
+    if (!r || !r.name) continue;
+    var obj = {
+      name: String(r.name),
+      feeUp: r.feeUp == null ? '' : String(r.feeUp),
+      adjUp: r.adjUp == null ? '' : String(r.adjUp),
+      feeDown: r.feeDown == null ? '' : String(r.feeDown),
+      adjDown: r.adjDown == null ? '' : String(r.adjDown)
+    };
+    var found = false;
+    for (var j = 0; j < state.rulePresets.length; j++) {
+      if (state.rulePresets[j].name === obj.name) {
+        state.rulePresets[j] = obj;
+        found = true;
+        updated++;
+        break;
+      }
+    }
+    if (!found) { state.rulePresets.push(obj); added++; }
+  }
+  saveToLS(LS_RULES, state.rulePresets);
+  renderRuleMenu();
+  showConfirm(t('msg.importDone'), tf('msg.rulesImported', [added, updated, state.rulePresets.length]), null, true);
+}
+
+/* 导入账目（校验必要字段，补齐缺失字段后追加） */
+function importLedger(entries) {
+  var added = 0;
+  for (var i = 0; i < entries.length; i++) {
+    var e = entries[i];
+    if (!e || typeof e.amount !== 'number' || typeof e.recv !== 'number') continue;
+    if (!e.id) e.id = 'IMP' + Date.now() + '' + i;
+    if (!e.time) e.time = Date.now();
+    if (!e.type) e.type = '代收';
+    state.ledger.push(e);
+    added++;
+  }
+  saveToLS(LS_LEDGER, state.ledger);
+  renderLedger();
+  showConfirm(t('msg.importDone'), tf('msg.ledgerImported', [added, state.ledger.length]), null, true);
+}
+
+/* ============================================================
+   v9：GitHub 云备份（账目/规则/自定义货币/常用备注 → 自己的仓库 JSON）
+   ============================================================ */
+var LS_GITHUB = 'novolink_github_config_v1';
+
+function openGithubModal() {
+  var cfg = loadFromLS(LS_GITHUB, {});
+  document.getElementById('ghOwner').value = cfg.owner || '';
+  document.getElementById('ghRepo').value = cfg.repo || '';
+  document.getElementById('ghBranch').value = cfg.branch || '';
+  document.getElementById('ghPath').value = cfg.path || '';
+  document.getElementById('ghToken').value = cfg.token || '';
+  ghSetStatus('');
+  document.getElementById('githubModal').classList.add('show');
+}
+
+function closeGithubModal() {
+  document.getElementById('githubModal').classList.remove('show');
+}
+
+/** 读取弹窗里的 GitHub 配置；save=true 时顺手持久化到本机 */
+function ghReadConfig(save) {
+  var cfg = {
+    owner: (document.getElementById('ghOwner').value || '').trim(),
+    repo: (document.getElementById('ghRepo').value || '').trim(),
+    branch: (document.getElementById('ghBranch').value || '').trim() || 'main',
+    path: ((document.getElementById('ghPath').value || '').trim() || 'fee-calculator/data.json').replace(/^\/+/, ''),
+    token: (document.getElementById('ghToken').value || '').trim()
+  };
+  if (save) saveToLS(LS_GITHUB, cfg);
+  return cfg;
+}
+
+function saveGithubConfig() {
+  var cfg = ghReadConfig(true);
+  if (!cfg.owner || !cfg.repo) { ghSetStatus(t('gh.needOwnerRepo'), true); return; }
+  ghSetStatus(t('gh.saved'));
+}
+
+function ghSetStatus(msg, isErr) {
+  var el = document.getElementById('ghStatus');
+  el.textContent = msg || '';
+  el.style.color = isErr ? 'var(--red)' : 'var(--green)';
+}
+
+/* ---------- UTF-8 安全 Base64（分块转换，支持大账本） ---------- */
+function b64encode(str) {
+  var bytes = new TextEncoder().encode(str);
+  var bin = '';
+  var CH = 0x8000;
+  for (var i = 0; i < bytes.length; i += CH) {
+    bin += String.fromCharCode.apply(null, bytes.subarray(i, i + CH));
+  }
+  return btoa(bin);
+}
+
+function b64decode(b64) {
+  var bin = atob(String(b64).replace(/\s/g, ''));
+  var bytes = new Uint8Array(bin.length);
+  for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return new TextDecoder('utf-8').decode(bytes);
+}
+
+/* ---------- GitHub REST API 请求封装 ---------- */
+function ghApi(method, apiPath, body) {
+  var cfg = ghReadConfig(false);
+  return fetch('https://api.github.com' + apiPath, {
+    method: method,
+    headers: {
+      'Accept': 'application/vnd.github+json',
+      'Authorization': 'Bearer ' + cfg.token,
+      'X-GitHub-Api-Version': '2022-11-28',
+      'Content-Type': 'application/json'
+    },
+    body: body ? JSON.stringify(body) : undefined
+  }).then(function (res) {
+    return res.json().catch(function () { return {}; }).then(function (j) {
+      return { status: res.status, json: j };
+    });
+  });
+}
+
+function ghErrMsg(r) {
+  if (r.status === 401) return t('gh.err401');
+  if (r.status === 403) return t('gh.err403');
+  if (r.status === 404) return t('gh.err404');
+  if (r.status === 409) return t('gh.err409');
+  return tf('gh.errHttp', [r.status, r.json && r.json.message ? r.json.message : '']);
+}
+
+/* ---------- 测试连接 ---------- */
+function testGithubConn() {
+  var cfg = ghReadConfig(true);
+  if (!cfg.owner || !cfg.repo) { ghSetStatus(t('gh.needOwnerRepo'), true); return; }
+  if (!cfg.token) { ghSetStatus(t('gh.needToken'), true); return; }
+  ghSetStatus(t('gh.connecting'));
+  ghApi('GET', '/repos/' + cfg.owner + '/' + cfg.repo).then(function (r) {
+    if (r.status === 200) {
+      ghSetStatus(r.json.private ? tf('gh.connOk', [r.json.full_name]) : tf('gh.connOkPub', [r.json.full_name]));
+    } else {
+      ghSetStatus(ghErrMsg(r), true);
+    }
+  }).catch(function (err) {
+    ghSetStatus(tf('gh.netErr', [err.message]), true);
+  });
+}
+
+/* ---------- 备份数据打包（账目 + 规则 + 自定义货币 + 常用备注 + 货币选择） ---------- */
+function buildBackupData() {
+  return {
+    app: 'fee-calculator',
+    type: 'backup',
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    currencyFrom: state.currencyFrom,
+    currencyTo: state.currencyTo,
+    ledger: state.ledger,
+    rulePresets: state.rulePresets,
+    customCurrencies: state.customCurrencies,
+    remarkPresets: state.remarkPresets
+  };
+}
+
+/* ---------- 立即备份：GET 取 sha（新建或覆盖）→ PUT 提交 ---------- */
+function backupToGithub() {
+  var cfg = ghReadConfig(true);
+  if (!cfg.owner || !cfg.repo || !cfg.token) {
+    ghSetStatus(t('gh.needAll'), true);
+    return;
+  }
+  ghSetStatus(t('gh.backingUp'));
+  ghApi('GET', '/repos/' + cfg.owner + '/' + cfg.repo + '/contents/' + cfg.path + '?ref=' + encodeURIComponent(cfg.branch))
+    .then(function (r) {
+      var sha = (r.status === 200 && r.json && r.json.sha) ? r.json.sha : '';
+      var payload = {
+        message: tf('gh.commitMsg', [fmtTicketTime(Date.now())]),
+        content: b64encode(JSON.stringify(buildBackupData())),
+        branch: cfg.branch
+      };
+      if (sha) payload.sha = sha; // 已有文件 → 覆盖更新需要带 sha
+      return ghApi('PUT', '/repos/' + cfg.owner + '/' + cfg.repo + '/contents/' + cfg.path, payload);
+    })
+    .then(function (r) {
+      if (r.status === 200 || r.status === 201) {
+        ghSetStatus(tf('gh.backupOk', [r.json.content.path, String(r.json.commit && r.json.commit.sha).slice(0, 7)]));
+      } else {
+        ghSetStatus(ghErrMsg(r), true);
+      }
+    })
+    .catch(function (err) {
+      ghSetStatus(tf('gh.netErr', [err.message]), true);
+    });
+}
+
+/* ---------- 从云端恢复：GET → 确认 → 合并（账目按 id 去重追加，规则同名覆盖，不删本地） ---------- */
+function restoreFromGithub() {
+  var cfg = ghReadConfig(true);
+  if (!cfg.owner || !cfg.repo || !cfg.token) {
+    ghSetStatus(t('gh.needAll'), true);
+    return;
+  }
+  ghSetStatus(t('gh.reading'));
+  ghApi('GET', '/repos/' + cfg.owner + '/' + cfg.repo + '/contents/' + cfg.path + '?ref=' + encodeURIComponent(cfg.branch))
+    .then(function (r) {
+      if (r.status === 404) { ghSetStatus(t('gh.noFile'), true); return null; }
+      if (r.status !== 200) { ghSetStatus(ghErrMsg(r), true); return null; }
+      var data;
+      try { data = JSON.parse(b64decode(r.json.content)); }
+      catch (err) { ghSetStatus(t('gh.parseErr'), true); return null; }
+      if (!data || data.type !== 'backup' || !Array.isArray(data.ledger)) {
+        ghSetStatus(t('gh.notBackup'), true);
+        return null;
+      }
+      var ledCnt = data.ledger.length;
+      var ruleCnt = Array.isArray(data.rulePresets) ? data.rulePresets.length : 0;
+      var when = data.exportedAt ? data.exportedAt.replace('T', ' ').slice(0, 16) : t('gh.unknownTime');
+      showConfirm(t('gh.restoreTitle'),
+        tf('gh.restoreMsg', [when, ledCnt, ruleCnt]),
+        function () { applyBackupData(data); });
+      return data;
+    })
+    .catch(function (err) {
+      ghSetStatus(tf('gh.netErr', [err.message]), true);
+    });
+}
+
+/* ---------- 合并云端数据到本地 ---------- */
+function applyBackupData(data) {
+  var ids = {};
+  var i, j, k;
+  for (i = 0; i < state.ledger.length; i++) ids[state.ledger[i].id] = true;
+  var led = Array.isArray(data.ledger) ? data.ledger : [];
+  var added = 0;
+  for (i = 0; i < led.length; i++) {
+    var e = led[i];
+    if (!e || typeof e.amount !== 'number' || typeof e.recv !== 'number') continue;
+    if (!e.id) e.id = 'RS' + Date.now() + '' + i;
+    if (!e.time) e.time = Date.now();
+    if (!e.type) e.type = '代收';
+    if (ids[e.id]) continue;
+    ids[e.id] = true;
+    state.ledger.push(e);
+    added++;
+  }
+  var rules = Array.isArray(data.rulePresets) ? data.rulePresets : [];
+  var rAdded = 0, rUpdated = 0;
+  for (i = 0; i < rules.length; i++) {
+    var r = rules[i];
+    if (!r || !r.name) continue;
+    var obj = {
+      name: String(r.name),
+      feeUp: r.feeUp == null ? '' : String(r.feeUp),
+      adjUp: r.adjUp == null ? '' : String(r.adjUp),
+      feeDown: r.feeDown == null ? '' : String(r.feeDown),
+      adjDown: r.adjDown == null ? '' : String(r.adjDown)
+    };
+    var found = false;
+    for (j = 0; j < state.rulePresets.length; j++) {
+      if (state.rulePresets[j].name === obj.name) {
+        state.rulePresets[j] = obj;
+        found = true;
+        rUpdated++;
+        break;
+      }
+    }
+    if (!found) { state.rulePresets.push(obj); rAdded++; }
+  }
+  var curs = Array.isArray(data.customCurrencies) ? data.customCurrencies : [];
+  for (i = 0; i < curs.length; i++) {
+    var c = curs[i];
+    if (!c || !c.code) continue;
+    var has = false;
+    for (k = 0; k < state.customCurrencies.length; k++) {
+      if (state.customCurrencies[k].code === c.code) { has = true; break; }
+    }
+    if (!has) state.customCurrencies.push(c);
+  }
+  var rems = Array.isArray(data.remarkPresets) ? data.remarkPresets : [];
+  for (i = 0; i < rems.length; i++) {
+    if (typeof rems[i] === 'string' && state.remarkPresets.indexOf(rems[i]) === -1) state.remarkPresets.push(rems[i]);
+  }
+  saveToLS(LS_LEDGER, state.ledger);
+  saveToLS(LS_RULES, state.rulePresets);
+  saveToLS(LS_CUSTOM_CUR, state.customCurrencies);
+  saveToLS(LS_REMARKS, state.remarkPresets);
+  renderRuleMenu();
+  renderLedger();
+  ghSetStatus(tf('gh.restoreOk', [added, rAdded, rUpdated]));
+}
+
+/* 点击遮罩关闭云备份弹窗 */
+(function () {
+  var m = document.getElementById('githubModal');
+  if (m) m.addEventListener('click', function (e) { if (e.target === this) closeGithubModal(); });
+})();
+
+/* ============================================================
+   八、初始化
+   ============================================================ */
+(function init() {
+  state.customCurrencies = loadFromLS(LS_CUSTOM_CUR, []);
+  if (!Array.isArray(state.customCurrencies)) state.customCurrencies = [];
+  state.ledger = loadFromLS(LS_LEDGER, []);
+  if (!Array.isArray(state.ledger)) state.ledger = [];
+  state.remarkPresets = loadFromLS(LS_REMARKS, []);
+  if (!Array.isArray(state.remarkPresets)) state.remarkPresets = [];
+  state.rulePresets = loadFromLS(LS_RULES, []);
+  if (!Array.isArray(state.rulePresets)) state.rulePresets = [];
+
+  // v11 i18n：恢复上次选择的语言（默认 zh），并应用到静态 HTML
+  var lastLang = loadFromLS(LS_LANG, 'zh');
+  if (!I18N[lastLang]) lastLang = 'zh';
+  state.lang = lastLang;
+  var langSel = document.getElementById('langSelect');
+  if (langSel) langSel.value = state.lang;
+  applyI18n();
+
+  // 恢复上次选择的结算货币；仅当无历史记录（或已失效）时使用默认 USDT
+  var lastSettle = loadFromLS(LS_LAST_SETTLE, null);
+  if (typeof lastSettle === 'string' && lastSettle && isKnownCurrency(lastSettle)) {
+    state.currencyTo = lastSettle;
+  }
+
+  state.currentAmounts = [''];   // v8：动态金额输入行
+  state.ticketDraft = [];         // v8：工单草稿（多规则）
+  buildCurrencyPickers();
+  refreshPrefixes();
+  renderAmountList();
+  renderDraft();
+  recalc();
+  renderLedger();
+})();
+</script>
+</body>
+</html>
