@@ -1,0 +1,52 @@
+flowchart TB
+    subgraph TG["Telegram"]
+        UG["🔵 上游群<br/>我 + 上游 + Bot<br/>chat_id → role=UPSTREAM"]
+        MG1["🟢 商户群 A<br/>我 + EC Markets + Bot<br/>chat_id → merchant_id=1"]
+        MG2["🟢 商户群 B<br/>我 + ZeroMarkets + Bot<br/>chat_id → merchant_id=2"]
+        AP["🔴 管理员私聊<br/>我 + Bot<br/>chat_id → role=ADMIN"]
+    end
+
+    subgraph BOT["Bot 服务（Node 20 + TS + Telegraf）"]
+        direction TB
+        IN["bot/index.ts<br/>Long Polling → Update"]
+        GD["guards.ts<br/>user_id / chat_id → 角色"]
+        RT["router<br/>commands/* + callbacks.ts"]
+        SM["domain/stateMachine.ts<br/>迁移校验 + CAS"]
+        CALC["core/calc.ts ★<br/>compute / norm（纯函数）"]
+        TKT["core/ticket.ts<br/>up / down / summary / ledger"]
+        DAO["store/*<br/>SQLite DAO（同步事务）"]
+        SYNC["sync/github.ts<br/>outbox.ts"]
+        I18N["i18n/{zh,en}.ts"]
+    end
+
+    subgraph DATA["数据层"]
+        DB[("SQLite data/bot.db<br/>WAL 模式")]
+        BK["data/backups/bot-YYYYMMDD.db<br/>每日 04:00"]
+        OB["data/outbox/*.json<br/>同步失败队列"]
+    end
+
+    subgraph GH["GitHub 私有仓库"]
+        JSON["fee-calculator/data.json<br/>v9 backup schema"]
+    end
+
+    WEB["网页端 v11<br/>index.html（localStorage）<br/>『从云端恢复』→ 只读副本"]
+
+    UG -->|"/rate 1.23456789<br/>点 ✅已收到结算"| IN
+    MG1 -->|"/order · 报单 · 撤回<br/>点 ✅结算完成"| IN
+    MG2 -->|同左| IN
+    AP -->|"/pending /batch /setrule<br/>/export /void"| IN
+
+    IN --> GD --> RT --> SM
+    SM --> CALC
+    SM --> TKT
+    SM --> DAO
+    TKT --> I18N
+    RT --> I18N
+    DAO <--> DB
+    DB --> BK
+    SM -->|"SETTLED 后异步"| SYNC
+    SYNC <-->|"GET sha → PUT base64<br/>409 → 重试 ×3"| JSON
+    SYNC -.->|失败| OB
+    OB -.->|每 10 分钟重试| SYNC
+    SYNC -.->|失败告警| AP
+    JSON -->|"用户手动点『从云端恢复』"| WEB

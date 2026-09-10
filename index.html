@@ -357,6 +357,18 @@ table tfoot td {
 .draft-meta { font-size: 12px; color: var(--text-sub); }
 .draft-totals { font-size: 12px; color: var(--text); margin-top: 6px; }
 .draft-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+/* v12：草稿勾选 / 工单样式 / 一键入账条 */
+.draft-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
+.draft-post-bar { border-top: 1px dashed var(--border); padding-top: 10px; }
+.draft-sel-info { font-size: 12px; color: var(--text-light); }
+.btn-mini { font-size: 12px; padding: 4px 10px; border: 1px solid var(--border); border-radius: 6px; background: #fff; color: var(--text); cursor: pointer; }
+.btn-mini:hover { border-color: var(--primary); color: var(--primary); }
+.copy-mode-opt { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--text-light); cursor: pointer; }
+.post-hint { font-size: 11px; color: var(--text-light); }
+.draft-pick { display: flex; align-items: center; gap: 8px; }
+.draft-pick input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; }
+.draft-item.dim { opacity: .5; }
+.edit-btn { border: none; background: none; color: var(--primary); font-size: 12px; cursor: pointer; padding: 0 4px; }
 
 /* 复制反馈 */
 .value.copyable { cursor: pointer; border-bottom: 1px dashed rgba(0,0,0,.15); }
@@ -379,7 +391,7 @@ table tfoot td {
   <!-- 顶栏 -->
   <div class="header" data-page-node-id="y4hj3Gi34BB6jtfKwBdXjU">
     <div data-page-node-id="fUV1CUWxtbA7ohFyQGVGuO">
-      <h1 data-page-node-id="2CxTTlkD1fxPmMb7sUG9Fe"><span class="logo" data-page-node-id="t9z5dONjwS0aqtqLCFGIut">◈</span><span data-i18n="app.name">费率结算自动计算器</span> <span id="appVerBadge" style="font-size:12px;font-weight:700;color:#0369a1;background:#e0f2fe;border:1px solid #7dd3fc;border-radius:999px;padding:2px 10px;margin-left:8px;vertical-align:middle;letter-spacing:.5px;">v11</span><select id="langSelect" onchange="onLangChange(this.value)" title="Language / 语言" style="font-size:12px;font-weight:500;color:#0369a1;background:#e0f2fe;border:1px solid #7dd3fc;border-radius:999px;padding:2px 8px;margin-left:6px;vertical-align:middle;outline:none;cursor:pointer;font-family:inherit;"><option value="zh">中文</option><option value="en">English</option><option value="ms">Bahasa Melayu</option><option value="vi">Tiếng Việt</option></select></h1>
+      <h1 data-page-node-id="2CxTTlkD1fxPmMb7sUG9Fe"><span class="logo" data-page-node-id="t9z5dONjwS0aqtqLCFGIut">◈</span><span data-i18n="app.name">费率结算自动计算器</span> <span id="appVerBadge" style="font-size:12px;font-weight:700;color:#0369a1;background:#e0f2fe;border:1px solid #7dd3fc;border-radius:999px;padding:2px 10px;margin-left:8px;vertical-align:middle;letter-spacing:.5px;">v12</span><select id="langSelect" onchange="onLangChange(this.value)" title="Language / 语言" style="font-size:12px;font-weight:500;color:#0369a1;background:#e0f2fe;border:1px solid #7dd3fc;border-radius:999px;padding:2px 8px;margin-left:6px;vertical-align:middle;outline:none;cursor:pointer;font-family:inherit;"><option value="zh">中文</option><option value="en">English</option><option value="ms">Bahasa Melayu</option><option value="vi">Tiếng Việt</option></select></h1>
       <div class="sub" data-i18n="app.sub" data-page-node-id="lYrgnNUGlxxFTWIQiTcidi">代收订单上下游结算 &amp; 记账（数据保存在本地浏览器）</div>
     </div>
     <div class="header-actions" data-page-node-id="HK5EesekBC8eFM1davQBYO">
@@ -407,13 +419,15 @@ table tfoot td {
     <!-- 结算规则栏（v7/v8/v10：费率方案预设 + 下游商户） -->
     <div class="rule-bar" id="ruleBar">
       <input type="text" id="ruleName" data-i18n-ph="ph.ruleName" placeholder="规则/业务名，如：欧洲A方案" maxlength="30">
-      <input type="text" id="merchant" data-i18n-ph="ph.merchant" placeholder="下游商户（如：EC Markets）" maxlength="30">
+      <input type="text" id="merchant" data-i18n-ph="ph.merchant" placeholder="下游商户（如：EC Markets）" maxlength="30" list="merchantList" autocomplete="off">
+      <datalist id="merchantList"></datalist>
       <button type="button" class="btn btn-outline" id="ruleSaveBtn" data-i18n="btn.saveRule" onclick="saveRulePreset()">💾 存为规则</button>
       <span class="rule-wrap">
         <button type="button" class="btn btn-outline" data-i18n="btn.applyRule" onclick="toggleRuleMenu(event)">套用规则 ▾</button>
         <div class="rule-menu" id="ruleMenu"></div>
       </span>
-      <button type="button" class="btn btn-outline" data-i18n="btn.addNextRule" onclick="addRuleToDraft()">＋ 添加下一规则</button>
+      <button type="button" class="btn btn-outline" id="addRuleBtn" data-i18n="btn.addNextRule" onclick="addRuleToDraft()">＋ 添加下一规则</button>
+      <button type="button" class="btn btn-outline" id="cancelEditBtn" data-i18n="draft.cancelEdit" onclick="cancelEditDraft()" style="display:none;">取消编辑</button>
       <label class="use-prev-rate"><input type="checkbox" id="usePrevRate" onchange="onUsePrevRate()"> <span data-i18n="opt.usePrevRate">套用前项汇率</span></label>
     </div>
 
@@ -531,9 +545,7 @@ table tfoot td {
         <button type="button" class="btn btn-outline remark-preset-btn" data-i18n="btn.remarkPresets" onclick="toggleRemarkMenu(event)">常用 ▾</button>
         <div class="remark-menu" id="remarkMenu"></div>
       </div>
-      <button class="btn btn-green" id="btnPost" data-i18n="btn.post" onclick="postToLedger()" data-page-node-id="MoaNOmDl0uxAtiW5IDGvEl">✓ 一键入账</button>
       <button class="btn btn-outline" data-i18n="btn.reset" onclick="resetCalculator()" data-page-node-id="Fba6xEHBpHwPg9FzEaPpGD">重置</button>
-      <span style="font-size:11px;color:var(--text-light);" data-i18n="hint.post" data-page-node-id="BSzM7Dc59BIgGnVm2PR623">无草稿时入账当前规则；有草稿时一键入账全部规则（按各规则的下游商户记账）</span>
     </div>
   </div>
 
@@ -546,6 +558,18 @@ table tfoot td {
       <button type="button" class="btn btn-outline" data-i18n="btn.downTicket" onclick="showDownstreamTicket()">📋 下游工单</button>
       <button type="button" class="btn btn-outline" data-i18n="btn.combinedTicket" onclick="showCombinedTicket()">📋 汇总工单</button>
       <button type="button" class="btn btn-outline" data-i18n="btn.clearDraft" onclick="clearDraft()">清空草稿</button>
+    </div>
+    <!-- v12：勾选要产出/入账的工单（默认全部）+ 工单样式开关 -->
+    <div class="draft-bar">
+      <span class="draft-sel-info" id="draftSelInfo"></span>
+      <button type="button" class="btn btn-mini" data-i18n="draft.selAll" onclick="selectAllDraft(true)">全选</button>
+      <button type="button" class="btn btn-mini" data-i18n="draft.selNone" onclick="selectAllDraft(false)">全不选</button>
+      <label class="copy-mode-opt"><input type="checkbox" id="copyMode" onchange="toggleCopyMode()"> <span data-i18n="opt.copyMode">TG 复制模式（数字加反引号，便于手机点按复制）</span></label>
+    </div>
+    <!-- v12：一键入账移到草稿下方 -->
+    <div class="draft-bar draft-post-bar">
+      <button class="btn btn-green" id="btnPost" data-i18n="btn.post" onclick="postToLedger()">✓ 一键入账</button>
+      <span class="post-hint" data-i18n="hint.post">无草稿时入账当前规则；有草稿时按勾选入账（按各规则的下游商户记账）</span>
     </div>
   </div>
 
@@ -583,7 +607,7 @@ table tfoot td {
     <div class="empty-tip" id="emptyTip" style="display:none;" data-i18n="ledger.empty" data-page-node-id="JBnXnTdCIqGnIkah4tIITo">暂无账目记录</div>
   </div>
 
-  <footer data-i18n="app.footer" data-page-node-id="Cm2w3yK8X85KDclpY52PyA">费率结算自动计算器 · 单文件本地版 v11 · 数据存储于浏览器 localStorage，不会上传任何服务器</footer>
+  <footer data-i18n="app.footer" data-page-node-id="Cm2w3yK8X85KDclpY52PyA">费率结算自动计算器 · 单文件本地版 v12 · 数据存储于浏览器 localStorage，不会上传任何服务器</footer>
 </div>
 
 <!-- 自定义货币弹窗 -->
@@ -617,7 +641,7 @@ table tfoot td {
 <div class="modal-mask" id="ticketModal">
   <div class="modal ticket-modal">
     <h4 id="ticketTitle">工单</h4>
-    <div data-i18n="ticketModal.hint" style="font-size:12px;color:#0369a1;background:#e0f2fe;border:1px dashed #7dd3fc;border-radius:6px;padding:4px 10px;margin:0 0 8px 0;">版本 v11 · 工单内所有数字均已用单反引号包裹，粘贴到 Telegram 后可逐个点按复制。若未见此提示，说明正在使用旧版页面，请关闭后重新打开 index.html。</div>
+    <div data-i18n="ticketModal.hint" style="font-size:12px;color:#0369a1;background:#e0f2fe;border:1px dashed #7dd3fc;border-radius:6px;padding:4px 10px;margin:0 0 8px 0;">版本 v12 · 工单默认为清爽版（不加反引号、少符号）；需要手机点按复制单个数字时，打开「TG 复制模式」开关即可。</div>
     <pre class="ticket-pre" id="ticketText"></pre>
     <div class="modal-actions">
       <button class="btn btn-outline" data-i18n="btn.close" onclick="hideTicket()">关闭</button>
@@ -690,6 +714,7 @@ var LS_LAST_SETTLE = 'novolink_settle_currency_v1';  // 上次选择的结算货
 var LS_REMARKS = 'novolink_remark_presets_v1';        // 备注常用选项
 var LS_RULES = 'novolink_rule_presets_v1';            // 结算规则预设（v7）
 var LS_LANG = 'fcLang';                                // 界面语言（v11 i18n）
+var LS_MERCHANTS = 'novolink_merchants_v1';           // 常用商户库（v12）
 
 /* ============================================================
    一·五、多语言支持（v11 i18n：zh / en / ms / vi）
@@ -701,7 +726,7 @@ var I18N = {
     'app.title': '费率结算自动计算器',
     'app.name': '费率结算自动计算器',
     'app.sub': '代收订单上下游结算 & 记账（数据保存在本地浏览器）',
-    'app.footer': '费率结算自动计算器 · 单文件本地版 v11 · 数据存储于浏览器 localStorage，不会上传任何服务器',
+    'app.footer': '费率结算自动计算器 · 单文件本地版 v12 · 数据存储于浏览器 localStorage，不会上传任何服务器',
     'btn.customCur': '＋ 自定义货币', 'btn.cloudBackup': '☁ 云备份', 'btn.exportRules': '导出规则',
     'btn.exportLedger': '导出账目', 'btn.import': '导入', 'btn.exportCsv': '导出 CSV', 'btn.clearLedger': '清空账本',
     'btn.saveRule': '💾 存为规则', 'btn.applyRule': '套用规则 ▾', 'btn.addNextRule': '＋ 添加下一规则',
@@ -745,6 +770,11 @@ var I18N = {
     'draft.empty': '暂无草稿：为每个商户逐条添加业务规则（填「下游商户」+「规则名」+ 费率/金额），点「＋ 添加下一规则」暂存，再一键入账 / 生成工单；无草稿时按当前输入处理。',
     'draft.metaEntries': '{0} 笔', 'draft.metaRate': '汇率 {0}', 'draft.gasMark': '含Gas',
     'draft.subRecv': '小计实收', 'draft.subPay': '小计实付', 'draft.gross': '毛利',
+    'draft.edit': '编辑', 'draft.saveEdit': '保存修改', 'draft.cancelEdit': '取消编辑',
+    'draft.selAll': '全选', 'draft.selNone': '全不选', 'draft.selCount': '已选 {0} / 共 {1} 条（未勾选的不生成工单与入账）',
+    'draft.selTip': '勾选后才会生成工单 / 入账',
+    'opt.copyMode': 'TG 复制模式（数字加反引号，便于手机点按复制）',
+    'msg.noDraftSelected': '请至少勾选一条草稿规则，再生成工单或入账。',
     'rule.current': '当前业务',
     'ruleSummary': '上{0}%{1} / 下{2}%{3}',
     'rm.empty': '暂无常用备注：先在输入框填写，再点下方按钮保存',
@@ -765,7 +795,7 @@ var I18N = {
     'cur.errDup': '货币代码 {0} 已存在', 'cur.added': '添加成功',
     'cur.addedMsg': '货币 {0}（{1}）已添加，可在下拉中选择。',
     'cur.searchPh': '搜索货币代码 / 名称…', 'cur.custom': '（自定义）', 'cur.noMatch': '无匹配货币',
-    'ticketModal.hint': '版本 v11 · 工单内所有数字均已用单反引号包裹，粘贴到 Telegram 后可逐个点按复制。若未见此提示，说明正在使用旧版页面，请关闭后重新打开 index.html。',
+    'ticketModal.hint': '版本 v12 · 工单默认为清爽版（不加反引号、少符号）；需要手机点按复制单个数字时，打开「TG 复制模式」开关即可。',
     'cf.title': '确认', 'btn.ok': '知道了', 'btn.confirm': '确认',
     'msg.tip': '提示', 'msg.delTitle': '删除该笔账目？', 'msg.delMsg': '删除后不可恢复，请确认。',
     'msg.ledgerEmpty': '账本当前为空，无需清空。', 'msg.clearTitle': '清空全部账目？',
@@ -849,7 +879,7 @@ I18N.en = {
   'app.title': 'Fee Settlement Calculator',
   'app.name': 'Fee Settlement Calculator',
   'app.sub': 'Upstream/downstream settlement & bookkeeping for collection orders (data stored locally in your browser)',
-  'app.footer': 'Fee Settlement Calculator · Single-file local version v11 · Data is stored in browser localStorage and never uploaded to any server',
+  'app.footer': 'Fee Settlement Calculator · Single-file local version v12 · Data is stored in browser localStorage and never uploaded to any server',
   'btn.customCur': '＋ Custom Currency', 'btn.cloudBackup': '☁ Cloud Backup', 'btn.exportRules': 'Export Rules',
   'btn.exportLedger': 'Export Ledger', 'btn.import': 'Import', 'btn.exportCsv': 'Export CSV', 'btn.clearLedger': 'Clear Ledger',
   'btn.saveRule': '💾 Save Rule', 'btn.applyRule': 'Apply Rule ▾', 'btn.addNextRule': '＋ Add Next Rule',
@@ -893,6 +923,11 @@ I18N.en = {
   'draft.empty': 'No drafts yet: add a business rule for each merchant (fill "Downstream merchant" + "Rule name" + fees/amounts), click "＋ Add Next Rule" to stage it, then post or generate tickets at once; without drafts the current input is used.',
   'draft.metaEntries': '{0} entries', 'draft.metaRate': 'Rate {0}', 'draft.gasMark': 'incl. Gas',
   'draft.subRecv': 'Subtotal received', 'draft.subPay': 'Subtotal paid', 'draft.gross': 'Gross',
+  'draft.edit': 'Edit', 'draft.saveEdit': 'Save changes', 'draft.cancelEdit': 'Cancel edit',
+  'draft.selAll': 'Select all', 'draft.selNone': 'Clear', 'draft.selCount': '{0} of {1} selected (unselected are excluded from tickets & posting)',
+  'draft.selTip': 'Only selected rules are included',
+  'opt.copyMode': 'TG copy mode (wrap numbers in backticks for tap-to-copy)',
+  'msg.noDraftSelected': 'Select at least one draft rule before generating a ticket or posting.',
   'rule.current': 'Current business',
   'ruleSummary': 'Up {0}%{1} / Down {2}%{3}',
   'rm.empty': 'No remark presets yet: type in the box first, then save with the button below',
@@ -913,7 +948,7 @@ I18N.en = {
   'cur.errDup': 'Currency code {0} already exists', 'cur.added': 'Added',
   'cur.addedMsg': 'Currency {0} ({1}) has been added and is available in the dropdown.',
   'cur.searchPh': 'Search code / name…', 'cur.custom': ' (custom)', 'cur.noMatch': 'No matching currency',
-  'ticketModal.hint': 'Version v11 · All numbers in the ticket are wrapped in single backticks so each can be tapped to copy after pasting into Telegram. If you do not see this notice, you are viewing an outdated page; please close and reopen index.html.',
+  'ticketModal.hint': 'Version v12 · Tickets are clean by default (no backticks, fewer symbols). Turn on "TG copy mode" when you need tap-to-copy numbers.',
   'cf.title': 'Confirm', 'btn.ok': 'Got it', 'btn.confirm': 'Confirm',
   'msg.tip': 'Notice', 'msg.delTitle': 'Delete this entry?', 'msg.delMsg': 'This cannot be undone. Please confirm.',
   'msg.ledgerEmpty': 'The ledger is already empty.', 'msg.clearTitle': 'Clear all entries?',
@@ -996,7 +1031,7 @@ I18N.ms = {
   'app.title': 'Kalkulator Penyelesaian Fi',
   'app.name': 'Kalkulator Penyelesaian Fi',
   'app.sub': 'Penyelesaian hulu & hilir serta catatan akaun untuk pesanan kutipan (data disimpan dalam pelayar tempatan)',
-  'app.footer': 'Kalkulator Penyelesaian Fi · Versi tempatan satu fail v11 · Data disimpan dalam localStorage pelayar dan tidak dimuat naik ke mana-mana pelayan',
+  'app.footer': 'Kalkulator Penyelesaian Fi · Versi tempatan satu fail v12 · Data disimpan dalam localStorage pelayar dan tidak dimuat naik ke mana-mana pelayan',
   'btn.customCur': '＋ Mata Wang Tersuai', 'btn.cloudBackup': '☁ Sandaran Awan', 'btn.exportRules': 'Eksport Peraturan',
   'btn.exportLedger': 'Eksport Akaun', 'btn.import': 'Import', 'btn.exportCsv': 'Eksport CSV', 'btn.clearLedger': 'Kosongkan Akaun',
   'btn.saveRule': '💾 Simpan Peraturan', 'btn.applyRule': 'Guna Peraturan ▾', 'btn.addNextRule': '＋ Tambah Peraturan Seterusnya',
@@ -1040,6 +1075,11 @@ I18N.ms = {
   'draft.empty': 'Tiada draf lagi: tambah peraturan perniagaan untuk setiap pedagang (isi "Pedagang hiliran" + "Nama peraturan" + fi/jumlah), klik "＋ Tambah Peraturan Seterusnya" untuk simpan sementara, kemudian rekod / jana resit sekali gus; tanpa draf, input semasa digunakan.',
   'draft.metaEntries': '{0} catatan', 'draft.metaRate': 'Kadar {0}', 'draft.gasMark': 'termasuk Gas',
   'draft.subRecv': 'Jumlah diterima', 'draft.subPay': 'Jumlah dibayar', 'draft.gross': 'Untung kasar',
+  'draft.edit': 'Sunting', 'draft.saveEdit': 'Simpan perubahan', 'draft.cancelEdit': 'Batal sunting',
+  'draft.selAll': 'Pilih semua', 'draft.selNone': 'Kosongkan', 'draft.selCount': '{0} daripada {1} dipilih (yang tidak dipilih dikecualikan)',
+  'draft.selTip': 'Hanya peraturan yang dipilih disertakan',
+  'opt.copyMode': 'Mod salin TG (balut nombor dengan backticks untuk salin dengan ketik)',
+  'msg.noDraftSelected': 'Pilih sekurang-kurangnya satu peraturan draf sebelum menjana resit atau merekod.',
   'rule.current': 'Perniagaan semasa',
   'ruleSummary': 'Atas {0}%{1} / Bawah {2}%{3}',
   'rm.empty': 'Tiada catatan lazim lagi: isi dalam kotak dahulu, kemudian simpan dengan butang di bawah',
@@ -1060,7 +1100,7 @@ I18N.ms = {
   'cur.errDup': 'Kod mata wang {0} sudah wujud', 'cur.added': 'Berjaya ditambah',
   'cur.addedMsg': 'Mata wang {0} ({1}) telah ditambah dan boleh dipilih dalam senarai jatuh.',
   'cur.searchPh': 'Cari kod / nama…', 'cur.custom': ' (tersuai)', 'cur.noMatch': 'Tiada mata wang sepadan',
-  'ticketModal.hint': 'Versi v11 · Semua nombor dalam resit dibalut dengan backtick tunggal supaya boleh disalin satu demi satu selepas ditampal ke Telegram. Jika notis ini tidak dipaparkan, anda menggunakan halaman lama; sila tutup dan buka semula index.html.',
+  'ticketModal.hint': 'Versi v12 · Resit bersih secara lalai (tiada backtick, kurang simbol). Hidupkan "Mod salin TG" bila perlu salin nombor dengan ketikan.',
   'cf.title': 'Sahkan', 'btn.ok': 'Faham', 'btn.confirm': 'Sahkan',
   'msg.tip': 'Notis', 'msg.delTitle': 'Padam catatan ini?', 'msg.delMsg': 'Tindakan ini tidak boleh diundur. Sila sahkan.',
   'msg.ledgerEmpty': 'Buku akaun sudah kosong.', 'msg.clearTitle': 'Kosongkan semua catatan?',
@@ -1143,7 +1183,7 @@ I18N.vi = {
   'app.title': 'Máy Tính Quyết Toán Phí',
   'app.name': 'Máy Tính Quyết Toán Phí',
   'app.sub': 'Quyết toán thượng/hạ nguồn & ghi sổ cho đơn thu hộ (dữ liệu lưu trong trình duyệt tại máy)',
-  'app.footer': 'Máy Tính Quyết Toán Phí · Phiên bản cục bộ một tệp v11 · Dữ liệu được lưu trong localStorage của trình duyệt, không tải lên bất kỳ máy chủ nào',
+  'app.footer': 'Máy Tính Quyết Toán Phí · Phiên bản cục bộ một tệp v12 · Dữ liệu được lưu trong localStorage của trình duyệt, không tải lên bất kỳ máy chủ nào',
   'btn.customCur': '＋ Tiền tệ tùy chỉnh', 'btn.cloudBackup': '☁ Sao lưu đám mây', 'btn.exportRules': 'Xuất quy tắc',
   'btn.exportLedger': 'Xuất sổ', 'btn.import': 'Nhập', 'btn.exportCsv': 'Xuất CSV', 'btn.clearLedger': 'Xóa sổ',
   'btn.saveRule': '💾 Lưu quy tắc', 'btn.applyRule': 'Áp dụng quy tắc ▾', 'btn.addNextRule': '＋ Thêm quy tắc tiếp theo',
@@ -1187,6 +1227,11 @@ I18N.vi = {
   'draft.empty': 'Chưa có bản nháp: thêm quy tắc kinh doanh cho từng đối tác (điền "Đối tác hạ nguồn" + "Tên quy tắc" + phí/số tiền), bấm "＋ Thêm quy tắc tiếp theo" để tạm lưu, rồi ghi sổ / tạo phiếu một lần; không có bản nháp thì dùng ô nhập hiện tại.',
   'draft.metaEntries': '{0} bút', 'draft.metaRate': 'Tỷ giá {0}', 'draft.gasMark': 'gồm Gas',
   'draft.subRecv': 'Tổng thực thu', 'draft.subPay': 'Tổng thực chi', 'draft.gross': 'Lãi gộp',
+  'draft.edit': 'Sửa', 'draft.saveEdit': 'Lưu thay đổi', 'draft.cancelEdit': 'Hủy sửa',
+  'draft.selAll': 'Chọn tất cả', 'draft.selNone': 'Bỏ chọn', 'draft.selCount': 'Đã chọn {0} / {1} (mục không chọn sẽ không xuất phiếu & ghi sổ)',
+  'draft.selTip': 'Chỉ quy tắc được chọn mới được tính',
+  'opt.copyMode': 'Chế độ sao chép TG (bao số bằng backticks để chạm sao chép)',
+  'msg.noDraftSelected': 'Hãy chọn ít nhất một quy tắc nháp trước khi tạo phiếu hoặc ghi sổ.',
   'rule.current': 'Kinh doanh hiện tại',
   'ruleSummary': 'Trên {0}%{1} / Dưới {2}%{3}',
   'rm.empty': 'Chưa có ghi chú hay dùng: nhập vào ô trước, rồi lưu bằng nút bên dưới',
@@ -1207,7 +1252,7 @@ I18N.vi = {
   'cur.errDup': 'Mã tiền tệ {0} đã tồn tại', 'cur.added': 'Đã thêm',
   'cur.addedMsg': 'Tiền tệ {0} ({1}) đã được thêm và có thể chọn trong danh sách.',
   'cur.searchPh': 'Tìm mã / tên…', 'cur.custom': ' (tùy chỉnh)', 'cur.noMatch': 'Không có tiền tệ phù hợp',
-  'ticketModal.hint': 'Phiên bản v11 · Mọi số trong phiếu được bọc trong dấu huyền đơn để có thể chạm sao chép từng số sau khi dán vào Telegram. Nếu không thấy thông báo này, bạn đang dùng trang cũ; vui lòng đóng và mở lại index.html.',
+  'ticketModal.hint': 'Phiên bản v12 · Phiếu mặc định dạng gọn (không backtick, ít ký hiệu). Bật "Chế độ sao chép TG" khi cần chạm sao chép từng số.',
   'cf.title': 'Xác nhận', 'btn.ok': 'Đã hiểu', 'btn.confirm': 'Xác nhận',
   'msg.tip': 'Thông báo', 'msg.delTitle': 'Xóa bút toán này?', 'msg.delMsg': 'Không thể hoàn tác sau khi xóa. Vui lòng xác nhận.',
   'msg.ledgerEmpty': 'Sổ hiện đang trống.', 'msg.clearTitle': 'Xóa toàn bộ bút toán?',
@@ -2340,105 +2385,11 @@ function ticketAdj(n) {
 /** 工单分隔线 */
 var TICKET_SEP = '────────────';
 
-/** 生成上游工单文本（要求当前输入全部合法，否则返回空串） */
-function buildUpstreamTicket() {
-  var v = validateInputs();
-  if (!v.ok) return '';
-  var r = compute(v.amount, v.rate, v.feeUp, v.feeDown, false, v.adjUp, v.adjDown);
-  var effUpRate = (v.rate + v.adjUp) * (1 - v.feeUp / 100);
-  return '📋 上游结算工单\n' + TICKET_SEP + '\n' +
-    '时间：' + fmtTicketTime(Date.now()) + '\n' +
-    '货币对：' + state.currencyFrom + ' → ' + state.currencyTo + '\n' +
-    '原始金额：`' + fmtTicketAmount(v.amount, state.currencyFrom) + '`\n' +
-    '原汇率：`' + fmtRate(v.rate) + '`\n' +
-    '上游费率：`' + v.feeUp + '%`\n' +
-    '单价调整：`' + ticketAdj(v.adjUp) + '`\n' +
-    '费后汇率：`' + fmtRateExt(effUpRate) + '`\n' +
-    TICKET_SEP + '\n' +
-    '✅ 实际打款（我方实收）：`' + fmtTicketAmount(r.recv, state.currencyTo) + '`';
-}
-
-/** 生成下游工单文本（要求当前输入全部合法；勾选 Gas 时追加扣费说明行） */
-function buildDownstreamTicket() {
-  var v = validateInputs();
-  if (!v.ok) return '';
-  var gas = document.getElementById('gasFee').checked;
-  var r = compute(v.amount, v.rate, v.feeUp, v.feeDown, gas, v.adjUp, v.adjDown);
-  var effDownRate = (v.rate + v.adjDown) * (1 - v.feeDown / 100);
-  var text = '📋 下游结算工单\n' + TICKET_SEP + '\n' +
-    '时间：' + fmtTicketTime(Date.now()) + '\n' +
-    '货币对：' + state.currencyFrom + ' → ' + state.currencyTo + '\n' +
-    '原始金额：`' + fmtTicketAmount(v.amount, state.currencyFrom) + '`\n' +
-    '原汇率：`' + fmtRate(v.rate) + '`\n' +
-    '我方费率：`' + v.feeDown + '%`\n' +
-    '单价调整：`' + ticketAdj(v.adjDown) + '`\n' +
-    '费后汇率：`' + fmtRateExt(effDownRate) + '`\n' +
-    TICKET_SEP + '\n' +
-    '✅ 实际打款（付给下游）：`' + fmtTicketAmount(r.pay, state.currencyTo) + '`';
-  if (gas) {
-    text += '\n（Gas Fee 由商户承担，实付已扣 `' + GAS_FEE + ' ' + state.currencyTo + '`）';
-  }
-  return text;
-}
-
-/** 生成入账记录全单工单文本（从 entry 字段重建，费后汇率现算） */
-function buildLedgerTicket(e) {
-  if (!e) return '';
-  var adjUp = e.adjUp || 0, adjDown = e.adjDown || 0;
-  var effUpRate = (e.rate + adjUp) * (1 - e.feeUp / 100);
-  var effDownRate = (e.rate + adjDown) * (1 - e.feeDown / 100);
-  var text = '📋 结算工单 · 全单信息\n' + TICKET_SEP + '\n' +
-    '时间：' + fmtTicketTime(e.time) + '\n' +
-    '备注：' + (e.remark ? e.remark : '—') + '\n' +
-    '类型：' + e.type + '\n' +
-    '货币对：' + e.currencyFrom + ' → ' + e.currencyTo + '\n' +
-    '原始金额：`' + fmtTicketAmount(e.amount, e.currencyFrom) + '`\n' +
-    TICKET_SEP + '\n' +
-    '⬆ 上游结算\n' +
-    '原汇率：`' + fmtRate(e.rate) + '`  费率：`' + e.feeUp + '%`  单价：`' + ticketAdj(adjUp) + '`\n' +
-    '费后汇率：`' + fmtRateExt(effUpRate) + '`\n' +
-    '实收（上游打款给我们）：`' + fmtTicketAmount(e.recv, e.currencyTo) + '`\n' +
-    TICKET_SEP + '\n' +
-    '⬇ 下游结算\n' +
-    '费率：`' + e.feeDown + '%`  单价：`' + ticketAdj(adjDown) + '`\n' +
-    '费后汇率：`' + fmtRateExt(effDownRate) + '`\n' +
-    '实付（我们打给下游）：`' + fmtTicketAmount(e.pay, e.currencyTo) + '`';
-  if (e.gasFee) {
-    text += '\n（Gas Fee 由商户承担，实付已扣 `' + GAS_FEE + ' ' + e.currencyTo + '`）';
-  }
-  text += '\n' + TICKET_SEP + '\n' +
-    '💰 本单毛利：`' + fmtTicketAmount(e.gross, e.currencyTo) + '`';
-  return text;
-}
-
-/** 打开上游工单弹窗（输入无效时提示先修正） */
-function showUpstreamTicket() {
-  var v = validateInputs();
-  if (!v.ok) { showConfirm('提示', '请先修正输入。', null, true); return; }
-  showTicket('上游结算工单', buildUpstreamTicket());
-}
-
-/** 打开下游工单弹窗（输入无效时提示先修正） */
-function showDownstreamTicket() {
-  var v = validateInputs();
-  if (!v.ok) { showConfirm('提示', '请先修正输入。', null, true); return; }
-  showTicket('下游结算工单', buildDownstreamTicket());
-}
-
-/** 打开某笔入账的全单工单弹窗 */
-function showLedgerTicket(id) {
-  var entry = null;
-  for (var i = 0; i < state.ledger.length; i++) {
-    if (state.ledger[i].id === id) { entry = state.ledger[i]; break; }
-  }
-  if (!entry) return;
-  showTicket('结算工单 · 全单信息', buildLedgerTicket(entry));
-}
 
 /** 工单弹窗：展示全文 + 整段复制（全文缓存于 _ticketText） */
 var _ticketText = '';
 function showTicket(title, text) {
-  _ticketText = text || '';
+  _ticketText = polishTicket(text || '');
   document.getElementById('ticketTitle').textContent = title;
   document.getElementById('ticketText').textContent = _ticketText;
   document.getElementById('ticketCopyBtn').textContent = t('btn.copyTicket');
@@ -2704,11 +2655,12 @@ function addRuleToDraft() {
     return;
   }
   var merchant = (document.getElementById('merchant').value || '').trim();
+  saveMerchant(merchant);   // v12：收入常用商户库
   var gas = document.getElementById('gasFee').checked;
   var tt = computeRuleTotals(v.amounts, v.rate, v.feeUp, v.feeDown, gas, v.adjUp, v.adjDown);
   var keepRate = document.getElementById('usePrevRate').checked;
   var prevRateStr = document.getElementById('rate').value;
-  state.ticketDraft.push({
+  var ruleObj = {
     name: name,
     merchant: merchant,
     rate: v.rate,
@@ -2718,7 +2670,19 @@ function addRuleToDraft() {
     amounts: v.amounts.slice(),
     lines: tt.lines, recv: tt.recv, pay: tt.pay, gross: tt.gross,
     curFrom: state.currencyFrom, curTo: state.currencyTo
-  });
+  };
+  // v12：编辑模式下覆盖原条目，不做新增
+  if (editingDraftIndex >= 0 && state.ticketDraft[editingDraftIndex]) {
+    ruleObj.sel = isDraftSel(state.ticketDraft[editingDraftIndex]);
+    state.ticketDraft[editingDraftIndex] = ruleObj;
+    editingDraftIndex = -1;
+    var b2 = document.getElementById('addRuleBtn');
+    if (b2) { b2.textContent = t('btn.addNextRule'); b2.classList.remove('btn-editing'); }
+    var c2 = document.getElementById('cancelEditBtn');
+    if (c2) c2.style.display = 'none';
+  } else {
+    state.ticketDraft.push(ruleObj);
+  }
   // 重置当前规则输入（保留抬头/批次/商户；勾选「套用前项汇率」时保留汇率，且勾选状态保持到下一条）
   document.getElementById('feeUp').value = '';
   document.getElementById('adjUp').value = '';
@@ -2736,7 +2700,21 @@ function addRuleToDraft() {
 
 function removeDraftRule(i) {
   state.ticketDraft.splice(i, 1);
+  if (editingDraftIndex === i) cancelEditDraft();
   renderDraft();
+}
+
+/* v12：清空当前规则输入（新增/取消编辑后复用） */
+function resetCurrentRuleInputs() {
+  document.getElementById('feeUp').value = '';
+  document.getElementById('adjUp').value = '';
+  document.getElementById('feeDown').value = '';
+  document.getElementById('adjDown').value = '';
+  document.getElementById('ruleName').value = '';
+  document.getElementById('gasFee').checked = false;
+  state.currentAmounts = [''];
+  renderAmountList();
+  recalc();
 }
 
 function clearDraft() {
@@ -2747,12 +2725,103 @@ function clearDraft() {
   });
 }
 
+/* v12：草稿勾选状态（默认全部选中；未勾选的不参与生成工单与入账） */
+function isDraftSel(d) { return d.sel !== false; }
+function selectedDraftRules() {
+  var out = [];
+  for (var i = 0; i < state.ticketDraft.length; i++) {
+    if (isDraftSel(state.ticketDraft[i])) out.push(state.ticketDraft[i]);
+  }
+  return out;
+}
+function toggleDraftSel(i, el) {
+  if (!state.ticketDraft[i]) return;
+  state.ticketDraft[i].sel = el.checked;
+  renderDraft();
+}
+function selectAllDraft(on) {
+  for (var i = 0; i < state.ticketDraft.length; i++) state.ticketDraft[i].sel = !!on;
+  renderDraft();
+}
+function updateSelInfo() {
+  var el = document.getElementById('draftSelInfo');
+  if (!el) return;
+  if (!state.ticketDraft.length) { el.textContent = ''; return; }
+  el.textContent = tf('draft.selCount', [selectedDraftRules().length, state.ticketDraft.length]);
+}
+
+/* v12：草稿编辑（把某条草稿回填到上方表单，保存后覆盖该条） */
+var editingDraftIndex = -1;
+function editDraftRule(i) {
+  var d = state.ticketDraft[i];
+  if (!d) return;
+  editingDraftIndex = i;
+  document.getElementById('ruleName').value = d.name || '';
+  document.getElementById('merchant').value = d.merchant || '';
+  document.getElementById('rate').value = d.rate || '';
+  document.getElementById('feeUp').value = d.feeUp === 0 ? '0' : (d.feeUp || '');
+  document.getElementById('adjUp').value = d.adjUp || '';
+  document.getElementById('feeDown').value = d.feeDown === 0 ? '0' : (d.feeDown || '');
+  document.getElementById('adjDown').value = d.adjDown || '';
+  document.getElementById('gasFee').checked = !!d.gas;
+  // 注意：parseNum 只接受字符串，草稿中的金额是数字，回填前需转成字符串
+  state.currentAmounts = [];
+  if (d.amounts && d.amounts.length) {
+    for (var ai = 0; ai < d.amounts.length; ai++) state.currentAmounts.push(String(d.amounts[ai]));
+  } else {
+    state.currentAmounts = [''];
+  }
+  renderAmountList();
+  recalc();
+  var btn = document.getElementById('addRuleBtn');
+  if (btn) { btn.textContent = t('draft.saveEdit'); btn.classList.add('btn-editing'); }
+  var cancel = document.getElementById('cancelEditBtn');
+  if (cancel) cancel.style.display = 'inline-block';
+  document.getElementById('ruleName').focus();
+}
+function cancelEditDraft() {
+  editingDraftIndex = -1;
+  var btn = document.getElementById('addRuleBtn');
+  if (btn) { btn.textContent = t('btn.addNextRule'); btn.classList.remove('btn-editing'); }
+  var cancel = document.getElementById('cancelEditBtn');
+  if (cancel) cancel.style.display = 'none';
+  resetCurrentRuleInputs();
+}
+
+/* v12：常用商户库（localStorage 持久化，供下拉选择，避免手打错字） */
+function loadMerchants() {
+  state.merchants = loadFromLS(LS_MERCHANTS, []);
+  if (!Array.isArray(state.merchants)) state.merchants = [];
+  renderMerchantList();
+}
+function saveMerchant(name) {
+  name = (name || '').trim();
+  if (!name) return;
+  if (!Array.isArray(state.merchants)) state.merchants = [];
+  for (var i = 0; i < state.merchants.length; i++) {
+    if (state.merchants[i] === name) return;
+  }
+  state.merchants.push(name);
+  saveToLS(LS_MERCHANTS, state.merchants);
+  renderMerchantList();
+}
+function renderMerchantList() {
+  var dl = document.getElementById('merchantList');
+  if (!dl) return;
+  var html = '';
+  for (var i = 0; i < state.merchants.length; i++) {
+    html += '<option value="' + escapeHtml(state.merchants[i]) + '"></option>';
+  }
+  dl.innerHTML = html;
+}
+
 function renderDraft() {
   if (!state.ticketDraft) state.ticketDraft = [];
   var list = state.ticketDraft;
   var wrap = document.getElementById('draftList');
   var count = document.getElementById('draftCount');
   count.textContent = tf('draft.count', [list.length]);
+  updateSelInfo();
   if (!list.length) {
     wrap.innerHTML = '<div class="empty-tip" style="padding:8px 0;">' + escapeHtml(t('draft.empty')) + '</div>';
     return;
@@ -2760,10 +2829,12 @@ function renderDraft() {
   var html = '';
   for (var i = 0; i < list.length; i++) {
     var d = list[i];
-    html += '<div class="draft-item">' +
-      '<div class="draft-head"><span class="draft-name">' + (i + 1) + '. ' + escapeHtml(d.name) + '</span>' +
-      '<span class="draft-meta">' + (d.merchant ? escapeHtml(d.merchant) + ' · ' : '') + tf('draft.metaEntries', [d.amounts.length]) + ' · ' + tf('draft.metaRate', [fmtRate(d.rate)]) + ' · ' + escapeHtml(ruleSummary(d)) + (d.gas ? ' · ' + t('draft.gasMark') : '') + '</span>' +
-      '<button class="del-btn" onclick="removeDraftRule(' + i + ')">' + escapeHtml(t('draft.remove')) + '</button></div>' +
+    var sel = isDraftSel(d);
+    html += '<div class="draft-item' + (sel ? '' : ' dim') + '">' +
+      '<div class="draft-pick"><input type="checkbox" ' + (sel ? 'checked' : '') + ' onchange="toggleDraftSel(' + i + ', this)" title="' + escapeHtml(t('draft.selTip')) + '"><span class="draft-name">' + (i + 1) + '. ' + escapeHtml(d.name) + '</span></div>' +
+      '<div class="draft-head"><span class="draft-meta">' + (d.merchant ? escapeHtml(d.merchant) + ' · ' : '') + tf('draft.metaEntries', [d.amounts.length]) + ' · ' + tf('draft.metaRate', [fmtRate(d.rate)]) + ' · ' + escapeHtml(ruleSummary(d)) + (d.gas ? ' · ' + t('draft.gasMark') : '') + '</span>' +
+      '<span><button class="edit-btn" onclick="editDraftRule(' + i + ')">' + escapeHtml(t('draft.edit')) + '</button>' +
+      '<button class="del-btn" onclick="removeDraftRule(' + i + ')">' + escapeHtml(t('draft.remove')) + '</button></span></div>' +
       '<div class="draft-totals">' + t('draft.subRecv') + ' <b class="num">' + fmtTicketAmount(d.recv, d.curTo || state.currencyTo) + '</b> · ' + t('draft.subPay') + ' <b class="num">' + fmtTicketAmount(d.pay, d.curTo || state.currencyTo) + '</b> · ' + t('draft.gross') + ' <b class="num">' + fmtTicketAmount(d.gross, d.curTo || state.currencyTo) + '</b></div>' +
       '</div>';
   }
@@ -2789,9 +2860,9 @@ function getCurrentRuleObj() {
   };
 }
 
-/* 工单/入账使用的规则集：草稿优先，无草稿用当前输入 */
+/* 工单/入账使用的规则集：草稿优先（v12：只取勾选项），无草稿用当前输入 */
 function getTicketRules() {
-  if (state.ticketDraft && state.ticketDraft.length) return state.ticketDraft;
+  if (state.ticketDraft && state.ticketDraft.length) return selectedDraftRules();
   var cur = getCurrentRuleObj();
   return cur ? [cur] : null;
 }
@@ -2799,8 +2870,44 @@ function getTicketRules() {
 /* ---------- 工单生成（v10：每个数字单独反引号包裹，TG 中点按即可复制单个数字；
      上游工单不含商户与我方抬头；下游工单按商户分组；汇总工单含商户小计，供自己看） ---------- */
 
-/** 单个数值反引号包裹（货币符号/百分号留在反引号外，复制出来是纯数字） */
-function tkN(s) { return '`' + s + '`'; }
+/* ---------- 工单样式（v12）：默认「清爽版」——不加反引号、去掉 emoji 与 ▎ 等装饰符号，
+   以空行分段，账目清晰不臃肿；需要手机点按复制时再打开「TG 复制模式」 ---------- */
+var COPY_MODE_KEY = 'fcCopyMode';
+var copyMode = false;
+function loadCopyMode() {
+  var s = null;
+  try { s = localStorage.getItem(COPY_MODE_KEY); } catch (e) {}
+  copyMode = (s === '1');
+}
+function setCopyMode(on) {
+  copyMode = !!on;
+  try { localStorage.setItem(COPY_MODE_KEY, copyMode ? '1' : '0'); } catch (e) {}
+}
+function toggleCopyMode() {
+  var el = document.getElementById('copyMode');
+  setCopyMode(el ? el.checked : false);
+}
+/** 清爽版清洗：去掉 emoji / ▎ / 分隔线堆砌，改用空行分段 */
+function polishTicket(text) {
+  if (copyMode || !text) return text;
+  var lines = String(text).split('\n'), out = [], lastBlank = false;
+  for (var i = 0; i < lines.length; i++) {
+    var raw = lines[i];
+    // 只移除 emoji / 装饰符（📋💰✅🏢▎ ─ 等），保留 → ← 等箭头与中文标点
+    var s = raw.replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, '')
+               .replace(/[\u2500-\u259F\u2700-\u27BF\u2B00-\u2BFF\uFE0F]/g, '');
+    if (!s.trim()) { if (!lastBlank && out.length) { out.push(''); lastBlank = true; } continue; }
+    if (/^[\u2500-\u2BFF\uD800-\uDBFF]/.test(raw)) s = s.replace(/^\s+/, '');
+    s = s.replace(/\s+$/, '');
+    lastBlank = false;
+    out.push(s);
+  }
+  while (out.length && !out[out.length - 1]) out.pop();
+  return out.join('\n');
+}
+
+/** 单个数值：TG 复制模式下用反引号包裹（货币符号/百分号留在外面，点按复制出纯数字） */
+function tkN(s) { return copyMode ? ('`' + s + '`') : String(s); }
 function tkNum(v) { var n = Number(v); return isNaN(n) ? 0 : n; } // 容错：旧数据字段可能是字符串
 function tkAmt(value, currencyCode) { return tkN(fmtAmountPlain(tkNum(value), currencyCode)) + ' ' + currencyCode; }
 function tkRate(n) { return tkN(fmtRate(tkNum(n))); }
@@ -2812,6 +2919,7 @@ function tkAdj(n) { n = tkNum(n); return tkN(n ? ((n > 0 ? '+' : '-') + Math.abs
 function buildDirectionTicket(kind) {
   var rules = getTicketRules();
   if (!rules) { showConfirm(t('msg.tip'), t('msg.fixInputsTicket'), null, true); return ''; }
+  if (!rules.length) { showConfirm(t('msg.tip'), t('msg.noDraftSelected'), null, true); return ''; }
   var isUp = kind === 'up';
   var isAll = kind === 'all';
   var title = isUp ? t('ticket.t.up') : (isAll ? t('ticket.t.all') : t('ticket.t.down'));
@@ -2834,7 +2942,8 @@ function buildDirectionTicket(kind) {
       var ud = rules[ui];
       var uFrom = ud.curFrom || state.currencyFrom, uTo = ud.curTo || state.currencyTo;
       L.push(TICKET_SEP);
-      L.push('▎' + (ui + 1) + '. ' + ud.name + (ud.gas ? t('ticket.gas') : ''));
+      // v12：上游工单不显示「商户承担 Gas Fee」（属下游商户与我方之间的约定，上游无需知晓）
+      L.push('▎' + (ui + 1) + '. ' + ud.name);
       L.push(tf('ticket.rateLine', [tkRate(ud.rate), uFrom, uTo]));
       L.push(tf('ticket.upLine', [tkFee(ud.feeUp), tkAdj(ud.adjUp), tkRateExt((ud.rate + ud.adjUp) * (1 - ud.feeUp / 100)), uTo]));
       for (var uj = 0; uj < ud.lines.length; uj++) {
@@ -2970,11 +3079,13 @@ function showLedgerTicket(id) {
 function postToLedger() {
   var rules;
   if (state.ticketDraft && state.ticketDraft.length) {
-    rules = state.ticketDraft;
+    rules = selectedDraftRules();                       // v12：只入账勾选项
+    if (!rules.length) { showConfirm(t('msg.tip'), t('msg.noDraftSelected'), null, true); return; }
   } else {
     var cur = getCurrentRuleObj();
     if (!cur) { showConfirm(t('msg.tip'), t('msg.fixInputs'), null, true); return; }
     rules = [cur];
+    saveMerchant(cur.merchant);                          // v12：收入常用商户库
   }
   // v10：入账前逐条校验草稿规则的 汇率/费率/金额（不合法则阻止整单入账）
   for (var c = 0; c < rules.length; c++) {
@@ -3525,6 +3636,12 @@ function applyBackupData(data) {
   if (typeof lastSettle === 'string' && lastSettle && isKnownCurrency(lastSettle)) {
     state.currencyTo = lastSettle;
   }
+
+  // v12：工单样式（默认清爽版）+ 常用商户库
+  loadCopyMode();
+  var cmEl = document.getElementById('copyMode');
+  if (cmEl) cmEl.checked = copyMode;
+  loadMerchants();
 
   state.currentAmounts = [''];   // v8：动态金额输入行
   state.ticketDraft = [];         // v8：工单草稿（多规则）

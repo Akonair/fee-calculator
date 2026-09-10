@@ -1,0 +1,121 @@
+sequenceDiagram
+    autonumber
+    participant MG as 商户群<br/>(chat→merchant)
+    participant AP as 管理员私聊
+    participant UG as 上游群
+    participant BS as BotServer
+    participant GD as Guards
+    participant OR as OrderRepo
+    participant BR as BatchRepo
+    participant RR as RateRepo
+    participant SM as StateMachine
+    participant CL as Calc
+    participant TK as Ticket
+    participant DP as Dispatch
+    participant LR as LedgerRepo
+    participant AU as AuditRepo
+    participant GS as GithubSync
+    participant DB as SQLite
+
+    Note over MG,DB: ① 商户报单
+    MG->>BS: /order
+    BS->>GD: resolveActor(ctx)
+    GD-->>BS: {role:MERCHANT, merchantId:1, lang:en}
+    BS->>OR: listAvailableRules(merchantId=1)
+    OR-->>BS: [欧洲A方案, 韩元通道]
+    BS->>MG: 业务项选择键盘
+    MG->>BS: callback p:r:7 (选业务项)
+    BS->>MG: 提示输入金额(可多笔)
+    MG->>BS: "1000, 2000"
+    BS->>MG: 确认卡 + [含Gas] [提交] [取消]
+    MG->>BS: callback g:o:12 (Gas toggle) → c:o:12 (提交)
+    BS->>OR: create() → status=DRAFTED
+    OR->>DB: INSERT orders + order_lines (tx)
+    BS->>AU: append(ORDER_CREATE)
+    BS->>AP: 🔔 待审核卡片 [通过][驳回]
+    BS->>MG: 📋 已提交，等待审核 [↩撤回]
+
+    Note over AP,DB: ② 管理员审核
+    AP->>BS: callback a:o:12 (通过)
+    BS->>GD: requireRole(ADMIN)
+    BS->>SM: assertTransit(DRAFTED → APPROVED)
+    BS->>OR: casUpdateStatus(12, DRAFTED, APPROVED)
+    OR->>DB: UPDATE ... WHERE id=12 AND status='DRAFTED' (tx)
+    Note right of DB: 同时写入 snap_* 费率快照<br/>规则之后再改也不影响此单
+    OR-->>BS: changes=1
+    BS->>AU: append(ORDER_APPROVE, from→to)
+    BS->>MG: ✅ 已审核，等待批次结算
+
+    Note over AP,UG: ③ 开批 + 发送上游
+    AP->>BS: /batch new
+    BS->>BR: create(upstreamId, EUR, USDT)
+    BR-->>BS: B20260910-01
+    AP->>BS: /batch add O20260910-001 O20260910-002
+    BS->>BR: assertSameCurrency() + assertNotFull(≤30)
+    BS->>OR: casUpdateStatus(APPROVED → IN_BATCH) (tx)
+    AP->>BS: /batch send
+    BS->>BR: 汇总 → UpstreamTicketDTO(无 merchant/无 gross)
+    BS->>TK: buildUpstreamTicket(dto, 'zh')
+    TK-->>BS: 上游视图工单文本
+    BS->>DP: sendToUpstreamBatch(文本)
+    DP->>UG: 📤 批次请求(仅业务项/金额/笔数)
+    BS->>OR: casUpdateStatus(IN_BATCH → SENT_UPSTREAM) (tx)
+    BS->>AU: append(BATCH_SEND)
+
+    Note over UG,DB: ④ 上游报价 → 自动算账
+    UG->>BS: /rate 1.23456789
+    BS->>GD: requireRole(UPSTREAM)
+    BS->>RR: quote(batchId, ruleId=NULL, rate)
+    RR->>DB: INSERT rate_quotes (tx)
+    BS->>RR: lastRateOfRule() → 算偏离%
+    RR-->>BS: deviation=2.3%
+    BS->>OR: casUpdateStatus(SENT_UPSTREAM → RATE_QUOTED) (tx)
+    BS->>UG: ✅ 汇率已记录(附偏离提示)
+    BS->>AP: 同步通知(含偏离%)
+
+    BS->>CL: 逐笔 compute(amount, rate, snapFeeUp, snapFeeDown, gas, snapAdjUp, snapAdjDown)
+    Note right of CL: ★ norm() 每步归一<br/>与网页端逐位一致
+    CL-->>BS: {recv, pay, gross}
+    BS->>OR: saveCalcResult() → CALCULATED (tx)
+    BS->>TK: buildUpstreamTicket / buildMerchantTicket / buildSummaryTicket
+    TK-->>BS: 三份工单文本
+    BS->>DP: sendToUpstreamBatch(上游工单 + [✅已收到结算])
+    DP->>UG: 📋 上游结算工单(无商户名)
+    BS->>DP: sendToMerchantBatch(merchant=1, 下游工单 + [✅结算完成])
+    DP->>MG: 📋 下游结算工单(无上游费率/毛利)
+    BS->>DP: sendToAdmin(汇总工单 含毛利)
+    DP->>AP: 💰 结算汇总工单(内部)
+
+    Note over UG,MG: ⑤ 双方隔离确认（先后不限）
+    UG->>BS: callback u:b:3 (已收到结算)
+    BS->>GD: requireRole(UPSTREAM)
+    BS->>OR: setConfirmBit(id, 'up', userId)
+    OR->>DB: UPDATE up_confirmed_at WHERE up_confirmed_at IS NULL (tx)
+    BS->>UG: ✅ 上游已确认收款
+    BS->>AP: ⏳ 等待商户确认
+    MG->>BS: callback d:b:3 (结算完成)
+    BS->>GD: requireRole(MERCHANT)
+    BS->>OR: setConfirmBit(id, 'down', userId)
+    OR->>DB: UPDATE down_confirmed_at ... (tx)
+    OR-->>BS: 两位都非空 → isFullyConfirmed()=true
+
+    Note over BS,GS: ⑥ 自动入账 + 汇总 + 同步
+    BS->>SM: assertTransit(CALCULATED → SETTLED)
+    BS->>LR: postBatch(batch, orders)
+    LR->>CL: 逐笔重算(不复用草稿值)
+    LR->>DB: INSERT ledger × N (UNIQUE ticketId+ruleIdx+lineIdx) (tx)
+    LR->>DB: UPDATE orders → SETTLED, batches → SETTLED (tx)
+    LR-->>BS: ticketId = T1757488800123
+    BS->>AU: append(LEDGER_POST, N 条)
+    BS->>DP: sendToAdmin(🎉 已结算 + 汇总工单 + 入账回执)
+    DP->>UG: (上游群: 结算完成通知，无毛利)
+    DP->>MG: (商户群: 感谢配合，无毛利)
+    BS->>GS: pushFull(全量 JSON) [异步，不阻塞]
+    GS->>GS: GET sha → PUT base64
+    alt 409 Conflict
+        GS->>GS: 重取 sha，重试 ×3 (500ms/1s/2s)
+    else 失败
+        GS->>GS: 落 data/outbox/
+        GS->>AP: ⚠️ 云备份失败，已排队重试
+    end
+    Note over GS: 数据库绝不回滚 —— Bot 是唯一事实来源

@@ -1,0 +1,13 @@
+graph LR
+    T01["T01 基础设施 + 数据层<br/>package.json · config · DDL · db.ts · types · logger · 入口骨架"]
+    T02["T02 计算内核 + 工单 + 对拍<br/>calc.ts · format.ts · ticket.ts · i18n · parity 测试"]
+    T03["T03 状态机 + DAO + 审计<br/>stateMachine · store/* · audit · state"]
+    T04["T04 Bot 交互层<br/>guards · keyboards · dispatch · commands/* · callbacks"]
+    T05["T05 同步 + 导出 + 部署文档<br/>sync/* · outbox · /export · README"]
+
+    T01 --> T02
+    T01 --> T03
+    T02 --> T04
+    T03 --> T04
+    T03 --> T05
+    T04 --> T05

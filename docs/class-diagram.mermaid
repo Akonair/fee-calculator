@@ -1,0 +1,311 @@
+classDiagram
+    direction LR
+
+    %% ========== 数据模型（对应 §4 DDL） ==========
+    class Merchant {
+        +INTEGER id
+        +TEXT code
+        +TEXT name
+        +TEXT header
+        +TEXT lang
+        +TEXT status
+    }
+    class Upstream {
+        +INTEGER id
+        +TEXT code
+        +TEXT name
+        +TEXT lang
+    }
+    class Chat {
+        +INTEGER chat_id
+        +TEXT chat_type
+        +TEXT role
+        +INTEGER merchant_id
+        +INTEGER upstream_id
+        +TEXT lang
+    }
+    class Rule {
+        +INTEGER id
+        +TEXT name
+        +TEXT currency_from
+        +TEXT currency_to
+        +REAL fee_up
+        +REAL adj_up
+        +REAL fee_down
+        +REAL adj_down
+        +INTEGER gas_default
+        +INTEGER version
+    }
+    class MerchantRule {
+        +INTEGER id
+        +INTEGER merchant_id
+        +INTEGER rule_id
+        +REAL fee_up
+        +REAL adj_up
+        +REAL fee_down
+        +REAL adj_down
+        +INTEGER enabled
+    }
+    class Order {
+        +INTEGER id
+        +TEXT order_no
+        +INTEGER merchant_id
+        +INTEGER rule_id
+        +INTEGER batch_id
+        +TEXT status
+        +INTEGER gas_flag
+        +REAL snap_fee_up
+        +REAL snap_adj_up
+        +REAL snap_fee_down
+        +REAL snap_adj_down
+        +REAL snap_gas_fee
+        +REAL rate
+        +REAL recv_total
+        +REAL pay_total
+        +REAL gross_total
+        +TEXT ticket_id
+        +INTEGER up_confirmed_at
+        +INTEGER up_confirmed_by
+        +INTEGER down_confirmed_at
+        +INTEGER down_confirmed_by
+        +isFullyConfirmed() bool
+    }
+    class OrderLine {
+        +INTEGER id
+        +INTEGER order_id
+        +INTEGER line_index
+        +REAL amount
+        +REAL recv
+        +REAL pay
+        +REAL gross
+    }
+    class Batch {
+        +INTEGER id
+        +TEXT batch_no
+        +INTEGER upstream_id
+        +TEXT currency_from
+        +TEXT currency_to
+        +TEXT status
+        +REAL default_rate
+        +INTEGER order_count
+        +INTEGER line_count
+    }
+    class RateQuote {
+        +INTEGER id
+        +INTEGER batch_id
+        +INTEGER rule_id
+        +REAL rate
+        +INTEGER quoted_by
+        +INTEGER superseded
+        +REAL deviation_pct
+        +INTEGER is_admin_fill
+    }
+    class LedgerEntry {
+        +TEXT id
+        +INTEGER time
+        +TEXT type
+        +TEXT header
+        +TEXT merchant
+        +TEXT batch
+        +TEXT rule_name
+        +INTEGER rule_index
+        +INTEGER line_index
+        +TEXT ticket_id
+        +REAL amount
+        +REAL rate
+        +REAL recv
+        +REAL pay
+        +REAL gross
+        +INTEGER gas_fee
+        +TEXT remark
+        +toWebJSON() Object
+    }
+    class AuditLog {
+        +INTEGER id
+        +INTEGER ts
+        +INTEGER actor_id
+        +TEXT actor_role
+        +TEXT action
+        +TEXT entity
+        +TEXT entity_id
+        +TEXT from_value
+        +TEXT to_value
+        +INTEGER by_admin
+    }
+
+    %% ========== 纯函数内核（core，零 IO） ==========
+    class Calc {
+        <<module>>
+        +GAS_FEE number
+        +norm(n) number
+        +compute(amount, rate, feeUp, feeDown, deductGas, adjUp, adjDown) CalcResult
+        +computeRuleTotals(amounts, rate, feeUp, feeDown, gas, adjUp, adjDown) RuleTotals
+    }
+    class Format {
+        <<module>>
+        +fmtNum(value, noDecimal) string
+        +fmtMoney(value, cur) string
+        +fmtRate(rate) string
+        +fmtRateExt(rate) string
+        +fmtDateTime(ts) string
+        +fmtSigned(n) string
+    }
+    class Ticket {
+        <<module>>
+        +buildUpstreamTicket(dto, lang) string
+        +buildMerchantTicket(dto, lang) string
+        +buildSummaryTicket(dto, lang) string
+        +buildLedgerTicket(entries, lang) string
+    }
+
+    %% ========== 领域服务 ==========
+    class StateMachine {
+        <<module>>
+        +TRANSITIONS Map
+        +canTransit(from, to) bool
+        +assertTransit(from, to, actor)
+        +applyConfirm(order, side, actorId) string
+    }
+    class Ids {
+        <<module>>
+        +newOrderNo(dayKey) string
+        +newBatchNo(dayKey) string
+        +newTicketId() string
+        +newLedgerId(ruleIdx, lineIdx) string
+    }
+
+    %% ========== 存储 DAO（同步事务） ==========
+    class Db {
+        <<singleton>>
+        -Database conn
+        +migrate() void
+        +tx(fn) any
+        +backup(destPath) Promise
+    }
+    class OrderRepo {
+        +create(merchantId, ruleId, lines, gas) Order
+        +casUpdateStatus(id, from, to) bool
+        +setConfirmBit(id, side, actorId) bool
+        +saveCalcResult(id, rate, lines) void
+        +listByStatus(status) Order[]
+        +findSuspiciousDup(merchantId, ruleId, amount) Order[]
+    }
+    class BatchRepo {
+        +create(upstreamId, curFrom, curTo) Batch
+        +addOrder(batchId, orderId) void
+        +assertSameCurrency(batchId, orderId) void
+        +assertNotFull(batchId) void
+        +markSettled(batchId, ticketId) void
+    }
+    class RateRepo {
+        +quote(batchId, ruleId, rate, byUserId) RateQuote
+        +resolveEffectiveRate(batchId, ruleId) number
+        +lastRateOfRule(ruleId) number
+    }
+    class LedgerRepo {
+        +postBatch(batch, orders) string
+        +toWebLedger() Object[]
+        +exportCsv() string
+    }
+    class AuditRepo {
+        +append(entry) void
+    }
+
+    %% ========== Bot 层 ==========
+    class BotServer {
+        -Telegraf bot
+        +launch() void
+        +stop() void
+    }
+    class Guards {
+        <<module>>
+        +resolveActor(ctx) Actor
+        +requireRole(actor, role) void
+        +requirePrivateChat(actor) void
+    }
+    class Keyboards {
+        <<module>>
+        +encode(verb, obj, id, arg) string
+        +decode(data) Callback
+        +rulePicker(rules, lang) Markup
+        +orderCard(order, lang) Markup
+        +confirmButtons(batchId, lang) Markup
+    }
+    class Dispatch {
+        <<module>>
+        +sendToUpstreamBatch(dto, lang) void
+        +sendToMerchantBatch(merchantId, dto, lang) void
+        +sendToAdmin(text) void
+        -sendChunked(chatId, text) void
+    }
+    class CommandHandlers {
+        +onOrder(ctx)
+        +onPending(ctx)
+        +onBatchNew(ctx)
+        +onBatchSend(ctx)
+        +onRate(ctx)
+        +onVoid(ctx)
+        +onSetRule(ctx)
+        +onExport(ctx)
+        +onBind(ctx)
+    }
+    class CallbackRouter {
+        +route(ctx) void
+    }
+
+    %% ========== 同步 ==========
+    class GithubSync {
+        -Octokit client
+        +pullRules() RulePreset[]
+        +pushFull(payload) Promise~bool~
+        -getSha() string
+        -putContent(payload, sha) Promise
+    }
+    class Outbox {
+        +enqueue(payload) void
+        +retryAll() Promise
+    }
+
+    %% ========== 关系 ==========
+    Chat "1" --> "0..1" Merchant : 绑定(role=MERCHANT)
+    Chat "1" --> "0..1" Upstream : 绑定(role=UPSTREAM)
+    Merchant "1" --> "0..*" MerchantRule : 可见规则
+    Rule "1" --> "0..*" MerchantRule : 授权给
+    Merchant "1" --> "0..*" Order : 报单
+    Rule "1" --> "0..*" Order : 按规则
+    Batch "1" --> "0..*" Order : 打包(货币对一致)
+    Upstream "1" --> "0..*" Batch : 接收
+    Order "1" --> "1..*" OrderLine : 一次多笔
+    Batch "1" --> "0..*" RateQuote : 报价历史
+    Rule "0..1" --> "0..*" RateQuote : 业务项覆盖
+    Batch "1" --> "0..*" LedgerEntry : 入账
+
+    OrderRepo ..> Db : 使用
+    BatchRepo ..> Db : 使用
+    RateRepo ..> Db : 使用
+    LedgerRepo ..> Db : 使用
+    AuditRepo ..> Db : 使用
+
+    OrderRepo ..> StateMachine : 迁移校验
+    OrderRepo ..> Ids : 生成单号
+    LedgerRepo ..> Calc : 逐笔重算
+    LedgerRepo ..> Ids : ticketId / entryId
+    Ticket ..> Format : 数字格式化
+    Ticket ..> Calc : 费后汇率
+
+    BotServer --> Guards
+    BotServer --> CommandHandlers
+    BotServer --> CallbackRouter
+    CommandHandlers --> Guards
+    CommandHandlers --> Keyboards
+    CommandHandlers --> Dispatch
+    CommandHandlers --> OrderRepo
+    CommandHandlers --> BatchRepo
+    CommandHandlers --> RateRepo
+    CommandHandlers --> LedgerRepo
+    CallbackRouter --> Keyboards
+    CallbackRouter --> OrderRepo
+    CallbackRouter --> BatchRepo
+    Dispatch --> Ticket : 生成工单文本
+    GithubSync --> LedgerRepo : toWebLedger()
+    GithubSync ..> Outbox : 失败降级
